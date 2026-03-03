@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Finance - Date Range Pro</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --bg-slate: #f1f5f9;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --white: #ffffff;
+            --red: #dc2626;
+            --green: #16a34a;
+            --emerald: #059669;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-slate);
+            color: var(--text-main);
+            padding-bottom: 40px;
+        }
+
+        .container { max-width: 448px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .justify-between { justify-content: space-between; }
+        .items-center { align-items: center; }
+        .gap-2 { gap: 8px; }
+        .hidden { display: none !important; }
+
+        header h1 { font-size: 20px; font-weight: 800; }
+        header span { color: var(--primary); }
+        .badge { font-size: 10px; font-weight: 700; padding: 4px 12px; border-radius: 99px; border: 1px solid #e2e8f0; }
+
+        .card-dark { background-color: #0f172a; color: white; padding: 16px; border-radius: 16px; transition: 0.3s; }
+        .progress-bg { width: 100%; background: rgba(255,255,255,0.1); height: 6px; border-radius: 99px; margin: 8px 0; overflow: hidden; }
+        .progress-bar { background: white; height: 100%; transition: 0.5s; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .stat-box { background: white; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; }
+        .stat-label { font-size: 9px; font-weight: 700; color: var(--text-muted); }
+        .stat-val { font-size: 14px; font-weight: 700; }
+
+        .form-container { background: white; padding: 16px; border: 1px solid #e2e8f0; border-radius: 16px; }
+        input, select, textarea { 
+            width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; 
+            background: #f8fafc; font-size: 14px; outline: none;
+        }
+        .input-big { font-size: 20px; font-weight: 900; padding: 12px; }
+
+        /* Filter Area */
+        .filter-section { display: flex; flex-direction: column; gap: 12px; }
+        .range-picker { 
+            background: white; border: 1px solid #e2e8f0; padding: 12px; border-radius: 12px; 
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .range-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .range-inputs input { font-size: 11px; padding: 6px; }
+
+        .filter-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+        .btn-filter { 
+            white-space: nowrap; padding: 8px 16px; border-radius: 99px; font-size: 10px; 
+            font-weight: 700; background: white; border: 1px solid #e2e8f0; color: var(--text-muted);
+        }
+        .active-filter { background: var(--primary) !important; color: white !important; }
+
+        .list-container { background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; }
+        .list-header { padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; }
+        .transaction-item { padding: 12px 16px; border-bottom: 1px solid #f8fafc; display: flex; justify-content: space-between; align-items: center; }
+
+        .btn-primary { background: var(--primary); color: white; font-weight: 700; padding: 12px; border: none; border-radius: 12px; width: 100%; cursor: pointer; }
+        .btn-apply { background: var(--primary); color: white; border: none; padding: 8px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+
+        #dataModal, #passwordModal { 
+            position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,0.6); 
+            display: flex; align-items: center; justify-content: center; padding: 16px;
+        }
+        .modal-content { background: white; border-radius: 16px; padding: 24px; width: 100%; max-width: 340px; }
+        .section-title { font-size: 10px; font-weight: 800; color: var(--primary); margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        
+        .text-success { color: var(--green); }
+        .text-danger { color: var(--red); }
+    </style>
+</head>
+<body>
+
+    <!-- Modal Password -->
+    <div id="passwordModal" class="hidden">
+        <div class="modal-content">
+            <h3 style="text-align: center; margin-bottom: 16px;">Konfirmasi Sandi</h3>
+            <input type="password" id="confirmPasswordInput" placeholder="Sandi: 170845" style="text-align: center; font-weight: 900; margin-bottom: 16px;">
+            <div class="flex gap-2">
+                <button onclick="closePasswordModal()" style="flex: 1; border: none; background: none; color: #64748b;">Batal</button>
+                <button id="btnConfirmAction" style="flex: 1; padding: 10px; border-radius: 8px; background: var(--red); color: white; border: none; font-weight: 700;">Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Data -->
+    <div id="dataModal" class="hidden">
+        <div class="modal-content">
+            <h3 style="text-align: center; margin-bottom: 16px;">Backup & Restore</h3>
+            
+            <div class="section-title">FILE JSON</div>
+            <div class="flex flex-col gap-2" style="margin-bottom: 20px;">
+                <button onclick="downloadJson()" class="btn-primary" style="font-size: 12px;">💾 Export ke JSON</button>
+                <button onclick="document.getElementById('filePicker').click()" class="btn-primary" style="background: var(--emerald); font-size: 12px;">📂 Import dari JSON</button>
+                <input type="file" id="filePicker" accept=".json" class="hidden" onchange="importFromJsonFile(event)">
+            </div>
+
+            <div class="section-title">CLIPBOARD</div>
+            <textarea id="manualTextData" rows="3" style="font-size: 10px; margin-bottom: 8px;"></textarea>
+            <div class="flex gap-2">
+                <button onclick="copyToClipboard()" style="flex: 1; font-size: 11px; padding: 8px; background: #f1f5f9; border: 1px solid #ccc; border-radius: 6px;">Salin</button>
+                <button onclick="restoreFromText()" style="flex: 1; font-size: 11px; padding: 8px; background: #0f172a; color: white; border: none; border-radius: 6px;">Tempel</button>
+            </div>
+
+            <button onclick="closeDataModal()" style="width: 100%; margin-top: 20px; font-size: 11px; color: var(--text-muted); background: none; border: none;">TUTUP</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <header class="flex justify-between items-center">
+            <h1>My<span> Finance</span></h1>
+            <div class="badge"><span id="statusText">Status: Aman</span></div>
+        </header>
+
+        <section id="limitCard" class="card-dark shadow-sm">
+            <div class="flex justify-between items-center">
+                <span style="font-size: 10px; font-weight: 700;">LIMIT OPERASIONAL (20%)</span>
+                <span id="spendingLimit" style="font-size: 14px; font-weight: 700;">Rp 0</span>
+            </div>
+            <div class="progress-bg"><div id="limitBar" class="progress-bar" style="width: 0%"></div></div>
+        </section>
+
+        <div class="grid-2">
+            <div class="stat-box"><p class="stat-label">MASUK</p><p id="totalIncome" class="stat-val text-success">Rp 0</p></div>
+            <div class="stat-box"><p class="stat-label">KELUAR</p><p id="totalExpense" class="stat-val text-danger">Rp 0</p></div>
+        </div>
+
+        <section class="form-container">
+            <div class="grid-2" style="margin-bottom: 12px;">
+                <input type="date" id="inputDate">
+                <select id="type">
+                    <option value="income">Masuk (+)</option>
+                    <option value="expense">Keluar (-)</option>
+                </select>
+            </div>
+            <input type="text" id="description" placeholder="Keterangan..." style="margin-bottom: 12px;">
+            <div style="position: relative; margin-bottom: 16px;">
+                <input type="number" id="amount" placeholder="Nominal" oninput="handleSmart(this)" class="input-big">
+                <p id="previewVal" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 10px; color: #6366f1;"></p>
+            </div>
+            <button onclick="addTransaction()" class="btn-primary">SIMPAN</button>
+        </section>
+
+        <!-- Filter & List -->
+        <section class="filter-section">
+            <div class="range-picker shadow-sm">
+                <p style="font-size: 10px; font-weight: 800; color: var(--text-muted);">RENTANG TANGGAL (DARI - SAMPAI):</p>
+                <div class="range-inputs">
+                    <input type="date" id="dateStart">
+                    <input type="date" id="dateEnd">
+                </div>
+                <button onclick="applyRangeFilter()" class="btn-apply">Terapkan Filter Rentang</button>
+            </div>
+
+            <div class="filter-row">
+                <button onclick="setFilter('today')" id="btn-today" class="btn-filter active-filter">Hari Ini</button>
+                <button onclick="setFilter('month')" id="btn-month" class="btn-filter">Bulan Ini</button>
+                <button onclick="setFilter('all')" id="btn-all" class="btn-filter">Semua</button>
+                <button onclick="openDataModal()" class="btn-filter" style="margin-left: auto; color: var(--primary); background: #eef2ff;">💾 DATA</button>
+            </div>
+
+            <div class="list-container">
+                <div class="list-header">
+                    <span id="labelFilter" style="font-size: 10px; font-weight: 800; color: var(--text-muted);">RIWAYAT</span>
+                    <button onclick="askClear()" style="font-size: 10px; color: var(--red); border: none; background: none;">RESET</button>
+                </div>
+                <div id="listBody" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const DB = 'finance_v2_data';
+        const PW = '170845';
+        let data = JSON.parse(localStorage.getItem(DB)) || [];
+        let filterMode = 'today';
+        let filterRange = { start: null, end: null };
+        let pendingDelete = null;
+
+        document.getElementById('inputDate').valueAsDate = new Date();
+        document.getElementById('dateStart').valueAsDate = new Date();
+        document.getElementById('dateEnd').valueAsDate = new Date();
+
+        function handleSmart(el) {
+            const val = parseFloat(el.value || 0) * 1000;
+            document.getElementById('previewVal').innerText = val > 0 ? "≈ " + formatIDR(val) : "";
+        }
+
+        function formatIDR(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n); }
+
+        function addTransaction() {
+            const date = document.getElementById('inputDate').value;
+            const type = document.getElementById('type').value;
+            let desc = document.getElementById('description').value;
+            const val = parseFloat(document.getElementById('amount').value || 0) * 1000;
+
+            // Validasi nominal
+            if (val <= 0 || !date) {
+                return alert("Cek kembali nominal/tanggal!");
+            }
+
+            // Aturan Keterangan: Wajib untuk keluar, opsional untuk masuk
+            if (type === 'expense' && (!desc || desc.trim() === "")) {
+                return alert("Keterangan wajib diisi untuk transaksi KELUAR!");
+            }
+            
+            // Jika masuk dan kosong, beri default 'Omset'
+            if (type === 'income' && (!desc || desc.trim() === "")) {
+                desc = "Omset";
+            }
+
+            data.push({ id: Date.now(), date, type, desc, val });
+            save();
+            document.getElementById('amount').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('previewVal').innerText = '';
+        }
+
+        function setFilter(m) {
+            filterMode = m;
+            document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active-filter'));
+            if(m !== 'range') document.getElementById('btn-' + m).classList.add('active-filter');
+            render();
+        }
+
+        function applyRangeFilter() {
+            filterRange.start = document.getElementById('dateStart').value;
+            filterRange.end = document.getElementById('dateEnd').value;
+            if(!filterRange.start || !filterRange.end) return alert("Pilih kedua tanggal!");
+            filterMode = 'range';
+            document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active-filter'));
+            render();
+        }
+
+        function askDelete(id) {
+            pendingDelete = () => { data = data.filter(x => x.id !== id); save(); };
+            document.getElementById('passwordModal').classList.remove('hidden');
+        }
+
+        function askClear() {
+            pendingDelete = () => { if(confirm("Hapus semua data?")) { data = []; save(); } };
+            document.getElementById('passwordModal').classList.remove('hidden');
+        }
+
+        function closePasswordModal() { document.getElementById('passwordModal').classList.add('hidden'); }
+
+        document.getElementById('btnConfirmAction').onclick = () => {
+            if(document.getElementById('confirmPasswordInput').value === PW) {
+                pendingDelete();
+                closePasswordModal();
+                document.getElementById('confirmPasswordInput').value = '';
+            } else { alert("Sandi Salah!"); }
+        };
+
+        // DATA HANDLERS
+        function openDataModal() {
+            document.getElementById('dataModal').classList.remove('hidden');
+            document.getElementById('manualTextData').value = JSON.stringify(data);
+        }
+        function closeDataModal() { document.getElementById('dataModal').classList.add('hidden'); }
+
+        function downloadJson() {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backup_${new Date().toLocaleDateString()}.json`;
+            a.click();
+        }
+
+        function importFromJsonFile(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const parsed = JSON.parse(ev.target.result);
+                    if(Array.isArray(parsed)) { data = parsed; save(); alert("Import Berhasil!"); closeDataModal(); }
+                } catch(err) { alert("Format File Salah!"); }
+            };
+            reader.readAsText(file);
+        }
+
+        function copyToClipboard() {
+            const tx = document.getElementById('manualTextData');
+            tx.select();
+            document.execCommand('copy');
+            alert("Teks data berhasil disalin!");
+        }
+
+        function restoreFromText() {
+            try {
+                const parsed = JSON.parse(document.getElementById('manualTextData').value);
+                if(Array.isArray(parsed)) { data = parsed; save(); alert("Restore Berhasil!"); closeDataModal(); }
+            } catch(e) { alert("Data Teks Rusak/Bukan JSON!"); }
+        }
+
+        function save() {
+            data.sort((a,b) => new Date(b.date) - new Date(a.date));
+            localStorage.setItem(DB, JSON.stringify(data));
+            render();
+        }
+
+        function render() {
+            const list = document.getElementById('listBody');
+            list.innerHTML = '';
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            const filtered = data.filter(item => {
+                if (filterMode === 'today') return item.date === todayStr;
+                if (filterMode === 'month') return item.date.startsWith(todayStr.substring(0, 7));
+                if (filterMode === 'range') {
+                    return item.date >= filterRange.start && item.date <= filterRange.end;
+                }
+                return true;
+            });
+
+            const label = document.getElementById('labelFilter');
+            if(filterMode === 'today') label.innerText = "HARI INI";
+            else if(filterMode === 'month') label.innerText = "BULAN INI";
+            else if(filterMode === 'all') label.innerText = "SEMUA RIWAYAT";
+            else if(filterMode === 'range') label.innerText = `RENTANG: ${filterRange.start} s/d ${filterRange.end}`;
+
+            let inc = 0, exp = 0;
+            filtered.forEach(item => {
+                if(item.type === 'income') inc += item.val; else exp += item.val;
+                const row = document.createElement('div');
+                row.className = "transaction-item";
+                row.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span style="font-weight: 800; color: ${item.type === 'income' ? 'var(--green)' : 'var(--red)'}">${item.type === 'income' ? '+' : '-'}</span>
+                        <div>
+                            <p style="font-size: 11px; font-weight: 700;">${item.desc}</p>
+                            <p style="font-size: 8px; color: var(--text-muted);">${item.date}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <p class="${item.type === 'income' ? 'text-success' : 'text-danger'}" style="font-size: 11px; font-weight: 800;">${formatIDR(item.val).replace('Rp', '')}</p>
+                        <button onclick="askDelete(${item.id})" style="border: none; background: none; color: #ccc; font-weight: bold; padding: 4px;">×</button>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+
+            const profit = inc * 0.2;
+            const limitRem = profit - exp;
+            
+            document.getElementById('totalIncome').innerText = formatIDR(inc);
+            document.getElementById('totalExpense').innerText = formatIDR(exp);
+            document.getElementById('spendingLimit').innerText = formatIDR(limitRem);
+            document.getElementById('limitBar').style.width = Math.min((exp/profit)*100 || 0, 100) + '%';
+            
+            const card = document.getElementById('limitCard');
+            if(exp > profit && profit > 0) {
+                card.style.background = 'var(--red)';
+                document.getElementById('statusText').innerText = "Status: Bahaya";
+            } else {
+                card.style.background = inc > 0 ? 'var(--emerald)' : '#0f172a';
+                document.getElementById('statusText').innerText = "Status: Aman";
+            }
+        }
+
+        render();
+    </script>
+</body>
+</html>
