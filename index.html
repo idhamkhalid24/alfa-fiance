@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finance Tracker - Minimalist Pro (Offline)</title>
+    <title>Finance Tracker - Minimalist Pro (IndexedDB)</title>
     <style>
-        /* CSS INTERNAL UNTUK MODE OFFLINE - MENGGANTIKAN TAILWIND CDN */
+        /* CSS INTERNAL UNTUK MODE OFFLINE */
         :root {
             --primary: #4f46e5;
             --primary-dark: #4338ca;
@@ -295,6 +295,33 @@
         /* Custom Scroll */
         .history-list::-webkit-scrollbar { width: 3px; }
         .history-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--text-dark);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 100px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -320,11 +347,27 @@
                     <strong style="display:block; font-size:14px;">Backup File (.json)</strong>
                     <span style="font-size:10px; color:var(--text-slate);">Simpan data ke perangkat</span>
                 </button>
-                <button onclick="exportToClipboard()" style="padding:15px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:left;">
-                    <strong style="display:block; font-size:14px;">Salin Teks</strong>
-                    <span style="font-size:10px; color:var(--text-slate);">Copy ke clipboard</span>
+                <button onclick="copyToClipboard()" style="padding:15px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:left;">
+                    <strong style="display:block; font-size:14px;">Salin ke Clipboard</strong>
+                    <span style="font-size:10px; color:var(--text-slate);">Copy data untuk backup</span>
+                </button>
+                <button onclick="showImportModal()" style="padding:15px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:left;">
+                    <strong style="display:block; font-size:14px;">Import dari Clipboard</strong>
+                    <span style="font-size:10px; color:var(--text-slate);">Paste data yang sudah dicopy</span>
                 </button>
                 <button onclick="closeBackupModal()" style="color:var(--text-slate); font-size:12px; margin-top:10px; background:none;">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Import -->
+    <div id="importModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 style="text-align:center; margin-top:0;">Import Data</h3>
+            <textarea id="importDataText" rows="5" placeholder="Tempel data JSON di sini..." style="width:100%; margin-bottom:16px; font-family:monospace; font-size:12px;"></textarea>
+            <div style="display:flex; gap:8px;">
+                <button onclick="closeImportModal()" style="flex:1; background:none; color:var(--text-slate); font-weight:bold;">Batal</button>
+                <button onclick="importFromText()" style="flex:1; background:var(--primary); color:white; padding:10px; border-radius:8px; font-weight:bold;">Import</button>
             </div>
         </div>
     </div>
@@ -418,20 +461,124 @@
                 <div id="transactionList" class="history-list"></div>
             </div>
         </section>
-
-        <div style="text-align:center; padding-top:16px;">
-            <button onclick="requestImportAccess()" style="background:none; color:var(--text-slate); font-size:10px; font-weight:bold;">
-                Import Data (Restore)
-            </button>
-        </div>
     </div>
 
     <script>
-        const STORAGE_KEY = 'finance_tracker_minimal_pro_offline';
+        const DB_NAME = 'FinanceTrackerDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'transactions';
         const APP_PASSWORD = '170845';
-        let transactions = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        
+        let db;
+        let transactions = [];
         let currentFilter = 'today';
         let pendingAction = null;
+
+        // Toast notification
+        function showToast(message, duration = 3000) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, duration);
+        }
+
+        // Inisialisasi IndexedDB
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                        store.createIndex('date', 'date', { unique: false });
+                        store.createIndex('type', 'type', { unique: false });
+                    }
+                };
+            });
+        }
+
+        // Load semua transaksi dari IndexedDB
+        async function loadTransactions() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+                
+                request.onsuccess = () => {
+                    transactions = request.result || [];
+                    transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    resolve(transactions);
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Simpan transaksi ke IndexedDB
+        async function saveTransaction(transactionData) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction([STORE_NAME], 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.add(transactionData);
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Hapus transaksi dari IndexedDB
+        async function deleteTransactionFromDB(id) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction([STORE_NAME], 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.delete(id);
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Hapus semua transaksi
+        async function clearAllTransactions() {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction([STORE_NAME], 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.clear();
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Import banyak transaksi
+        async function importTransactions(newTransactions) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction([STORE_NAME], 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                
+                // Clear existing data
+                store.clear().onsuccess = () => {
+                    // Add all new transactions
+                    newTransactions.forEach(t => {
+                        store.add(t);
+                    });
+                };
+                
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
 
         function getLocalDateString() {
             const now = new Date();
@@ -464,30 +611,40 @@
                 closePasswordModal(); 
                 if (action) action();
             } else {
-                alert("Sandi Salah!");
+                showToast("Sandi Salah!");
                 document.getElementById('confirmPasswordInput').value = '';
             }
         });
 
-        function addTransaction() {
+        async function addTransaction() {
             const dateVal = document.getElementById('inputDate').value;
             const type = document.getElementById('type').value;
             let desc = document.getElementById('description').value.trim();
             const amount = getActualAmount(document.getElementById('amount').value);
 
             if (type === 'income' && !desc) desc = "Omset";
-            if (type === 'expense' && !desc) { alert("Deskripsi wajib diisi untuk Pengeluaran"); return; }
-            if (!dateVal || amount <= 0) { alert("Nominal tidak valid"); return; }
+            if (type === 'expense' && !desc) { showToast("Deskripsi wajib diisi untuk Pengeluaran"); return; }
+            if (!dateVal || amount <= 0) { showToast("Nominal tidak valid"); return; }
 
-            const newEntry = { id: Date.now(), date: dateVal, description: desc, amount: amount, type: type };
-            transactions.push(newEntry);
+            const newEntry = { 
+                id: Date.now(), 
+                date: dateVal, 
+                description: desc, 
+                amount: amount, 
+                type: type 
+            };
             
-            saveAndRender();
+            await saveTransaction(newEntry);
+            await loadTransactions();
+            
+            render();
             
             document.getElementById('description').value = '';
             document.getElementById('amount').value = '';
             document.getElementById('liveAmountPreview').innerText = '';
             document.getElementById('inputDate').value = getLocalDateString();
+            
+            showToast("Transaksi berhasil disimpan");
         }
 
         function changeFilter(filter) {
@@ -514,26 +671,24 @@
             if (activeEl) activeEl.classList.add('active');
         }
 
-        function deleteTransaction(id) {
-            openPasswordModal(() => {
-                transactions = transactions.filter(t => t.id !== id);
-                saveAndRender();
+        async function deleteTransaction(id) {
+            openPasswordModal(async () => {
+                await deleteTransactionFromDB(id);
+                await loadTransactions();
+                render();
+                showToast("Transaksi dihapus");
             });
         }
 
-        function requestClearAll() {
-            openPasswordModal(() => {
+        async function requestClearAll() {
+            openPasswordModal(async () => {
                 if(confirm("Hapus semua data?")) {
-                    transactions = [];
-                    saveAndRender();
+                    await clearAllTransactions();
+                    await loadTransactions();
+                    render();
+                    showToast("Semua data dihapus");
                 }
             });
-        }
-
-        function saveAndRender() {
-            transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-            render();
         }
 
         function formatRupiah(num) {
@@ -639,12 +794,25 @@
 
         // Backup & Restore
         function openBackupModal() {
-            if (transactions.length === 0) return alert("Data masih kosong.");
+            if (transactions.length === 0) {
+                showToast("Data masih kosong.");
+                return;
+            }
             document.getElementById('backupOptionModal').classList.remove('hidden');
         }
 
         function closeBackupModal() {
             document.getElementById('backupOptionModal').classList.add('hidden');
+        }
+
+        function showImportModal() {
+            closeBackupModal();
+            document.getElementById('importModal').classList.remove('hidden');
+        }
+
+        function closeImportModal() {
+            document.getElementById('importModal').classList.add('hidden');
+            document.getElementById('importDataText').value = '';
         }
 
         function exportToFile() {
@@ -655,38 +823,82 @@
             a.href = url;
             a.download = `finance_backup_${getLocalDateString()}.json`;
             a.click();
+            URL.revokeObjectURL(url);
             closeBackupModal();
+            showToast("File backup tersimpan");
         }
 
-        function exportToClipboard() {
+        function copyToClipboard() {
             const dataStr = JSON.stringify(transactions);
-            const dummy = document.createElement("textarea");
-            document.body.appendChild(dummy);
-            dummy.value = dataStr;
-            dummy.select();
-            document.execCommand("copy");
-            document.body.removeChild(dummy);
-            alert("Data disalin! Simpan di catatan HP Anda.");
-            closeBackupModal();
-        }
-
-        function requestImportAccess() {
-            openPasswordModal(() => {
-                const raw = prompt("Tempel teks JSON backup di sini:");
-                if (raw) {
-                    try {
-                        const imported = JSON.parse(raw);
-                        if (Array.isArray(imported)) {
-                            transactions = imported;
-                            saveAndRender();
-                            alert("Berhasil Restore!");
-                        }
-                    } catch (e) { alert("Format data salah."); }
-                }
+            navigator.clipboard.writeText(dataStr).then(() => {
+                showToast("Data berhasil disalin ke clipboard!");
+                closeBackupModal();
+            }).catch(() => {
+                // Fallback untuk browser lama
+                const dummy = document.createElement("textarea");
+                document.body.appendChild(dummy);
+                dummy.value = dataStr;
+                dummy.select();
+                document.execCommand("copy");
+                document.body.removeChild(dummy);
+                showToast("Data berhasil disalin ke clipboard!");
+                closeBackupModal();
             });
         }
 
-        render();
+        async function importFromText() {
+            const raw = document.getElementById('importDataText').value.trim();
+            if (!raw) {
+                showToast("Data tidak boleh kosong");
+                return;
+            }
+            
+            try {
+                const imported = JSON.parse(raw);
+                if (!Array.isArray(imported)) {
+                    showToast("Format data tidak valid");
+                    return;
+                }
+                
+                // Validasi struktur data
+                const isValid = imported.every(item => 
+                    item.id && 
+                    item.date && 
+                    item.description && 
+                    typeof item.amount === 'number' && 
+                    (item.type === 'income' || item.type === 'expense')
+                );
+                
+                if (!isValid) {
+                    showToast("Struktur data tidak valid");
+                    return;
+                }
+                
+                await importTransactions(imported);
+                await loadTransactions();
+                render();
+                closeImportModal();
+                showToast(`Berhasil import ${imported.length} transaksi`);
+            } catch (e) {
+                showToast("Format JSON salah");
+            }
+        }
+
+        // Initialize aplikasi
+        async function initApp() {
+            try {
+                await initDB();
+                await loadTransactions();
+                render();
+                showToast("Aplikasi siap digunakan");
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                showToast("Gagal menginisialisasi database");
+            }
+        }
+
+        // Start the app
+        initApp();
     </script>
 </body>
 </html>
