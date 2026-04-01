@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finance Tracker - Minimalist Pro (IndexedDB) + Zakat Terpisah</title>
+    <title>Finance Tracker - Zakat Otomatis Batal Saat Transaksi Dihapus</title>
     <style>
         /* CSS INTERNAL UNTUK MODE OFFLINE */
         :root {
@@ -234,6 +234,12 @@
             border-radius: 20px;
             font-size: 8px;
             color: var(--islamic-gold);
+        }
+        
+        .history-chip.cancelled {
+            background: rgba(220,38,38,0.3);
+            color: #fecaca;
+            text-decoration: line-through;
         }
         
         .btn-link-gold {
@@ -506,6 +512,11 @@
             border-bottom: none;
         }
         
+        .history-record.cancelled {
+            background: #fef2f2;
+            opacity: 0.6;
+        }
+        
         .history-date {
             font-weight: bold;
             color: var(--islamic-gold);
@@ -516,12 +527,31 @@
             color: var(--green);
         }
         
+        .history-amount.cancelled {
+            color: var(--red);
+            text-decoration: line-through;
+        }
+        
         .doa-text {
             font-size: 9px;
             text-align: center;
             margin-top: 8px;
             font-style: italic;
             opacity: 0.7;
+        }
+        
+        .warning-badge {
+            background: #dc2626;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 8px;
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
         }
     </style>
 </head>
@@ -584,7 +614,7 @@
 
     <div class="container">
         <header>
-            <div class="logo"><span>✦</span> ALFA <span>✦</span></div>
+            <div class="logo"><span>-</span> Sedekah Bro Jangan Lupa <span>-</span></div>
             <div id="statusBadge" class="badge">
                 <span id="statusText">Status: Aman</span>
             </div>
@@ -734,7 +764,7 @@
         let currentFilter = 'today';
         let pendingAction = null;
 
-        // ==== ZAKAT MANAGEMENT =====
+        // ==== ZAKAT MANAGEMENT dengan Auto-Cancel ====
         function getZakatHistory() {
             const stored = localStorage.getItem('zakatPaymentHistory');
             if (!stored) return [];
@@ -761,7 +791,9 @@
             const history = getZakatHistory();
             let totalProfitZakatPaid = 0;
             history.forEach(record => {
-                totalProfitZakatPaid += record.profitAtPayment;
+                if (!record.cancelled) {
+                    totalProfitZakatPaid += record.profitAtPayment;
+                }
             });
             return totalProfitZakatPaid;
         }
@@ -777,6 +809,35 @@
             return unpaidProfit * 0.025;
         }
         
+        // Fungsi untuk memvalidasi dan membatalkan zakat yang tidak valid
+        function validateAndCancelInvalidZakat() {
+            const history = getZakatHistory();
+            const totalProfit = getTotalProfit();
+            let hasChanges = false;
+            
+            // Hitung total profit yang sudah dizakati (tidak termasuk yang dibatalkan)
+            let totalValidPaidProfit = 0;
+            const updatedHistory = history.map(record => {
+                if (record.cancelled) return record;
+                
+                // Jika profitAtPayment melebihi total profit saat ini, tandai sebagai batal
+                if (record.profitAtPayment > totalProfit) {
+                    hasChanges = true;
+                    showToast(`⚠️ Zakat sebesar ${formatRupiah(record.zakatPaid)} dibatalkan karena transaksi yang menjadi dasar laba telah dihapus.`, 4000);
+                    return { ...record, cancelled: true, cancelledAt: new Date().toISOString() };
+                }
+                totalValidPaidProfit += record.profitAtPayment;
+                return record;
+            });
+            
+            // Jika ada yang dibatalkan, simpan perubahan
+            if (hasChanges) {
+                saveZakatHistory(updatedHistory);
+            }
+            
+            return hasChanges;
+        }
+        
         function markZakatPaid() {
             const zakatDue = getCurrentZakatDue();
             if (zakatDue <= 0) {
@@ -788,16 +849,25 @@
             const now = new Date();
             const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
             
-            if (confirm(`🕌 Bayar Zakat Mal\n\nBesaran Zakat: ${formatRupiah(zakatDue)}\nDari Laba: ${formatRupiah(unpaidProfit)}\n\n"Ambillah zakat dari harta mereka, guna membersihkan dan menyucikan mereka." (QS. At-Taubah: 103)\n\nLanjutkan pembayaran?`)) {
+            // Catat juga daftar transaksi yang menjadi dasar perhitungan
+            const contributingTransactions = transactions
+                .filter(t => t.type === 'income')
+                .map(t => ({ id: t.id, amount: t.amount, date: t.date, description: t.description }));
+            
+            if (confirm(`🕌 Bayar Zakat Mal\n\nBesaran Zakat: ${formatRupiah(zakatDue)}\nDari Laba: ${formatRupiah(unpaidProfit)}\n\n"Ambillah zakat dari harta mereka, guna membersihkan dan menyucikan mereka." (QS. At-Taubah: 103)\n\n⚠️ PENTING: Jika transaksi yang menghasilkan laba ini dihapus, zakat akan otomatis dibatalkan.\n\nLanjutkan pembayaran?`)) {
                 const history = getZakatHistory();
                 history.push({
+                    id: Date.now(),
                     date: dateStr,
                     profitAtPayment: unpaidProfit,
-                    zakatPaid: zakatDue
+                    zakatPaid: zakatDue,
+                    cancelled: false,
+                    contributingTransactions: contributingTransactions.length, // simpan jumlah transaksi sebagai referensi
+                    note: `Zakat dari laba Rp ${formatRupiah(unpaidProfit)}`
                 });
                 saveZakatHistory(history);
                 render();
-                showToast("✅ Alhamdulillah, zakat telah dibayar. Semoga Allah menerima amal ibadah kita.");
+                showToast("✅ Alhamdulillah, zakat telah dibayar. Jika ada transaksi yang dibatalkan, zakat akan otomatis disesuaikan.");
             }
         }
         
@@ -811,11 +881,14 @@
             } else {
                 let html = '';
                 history.slice().reverse().forEach((record) => {
+                    const isCancelled = record.cancelled;
+                    const cancelledClass = isCancelled ? 'cancelled' : '';
                     html += `
-                        <div class="history-record">
-                            <div><span class="history-date">📅 ${record.date}</span></div>
-                            <div>💰 Zakat dibayar: <span class="history-amount">${formatRupiah(record.zakatPaid)}</span></div>
+                        <div class="history-record ${cancelledClass}">
+                            <div><span class="history-date">📅 ${record.date}</span> ${isCancelled ? '<span class="warning-badge">BATAL</span>' : ''}</div>
+                            <div>💰 Zakat dibayar: <span class="history-amount ${isCancelled ? 'cancelled' : ''}">${formatRupiah(record.zakatPaid)}</span></div>
                             <div style="font-size:9px; color:var(--text-slate);">Dari laba: ${formatRupiah(record.profitAtPayment)}</div>
+                            ${isCancelled ? '<div style="font-size:8px; color:#dc2626;">❌ Dibatalkan karena transaksi yang menjadi dasar laba telah dihapus</div>' : ''}
                         </div>
                     `;
                 });
@@ -976,16 +1049,34 @@
 
         async function deleteTransaction(id) {
             openPasswordModal(async () => {
+                // Cari transaksi yang akan dihapus
+                const deletedTransaction = transactions.find(t => t.id === id);
+                const isIncome = deletedTransaction?.type === 'income';
+                const deletedAmount = deletedTransaction?.amount || 0;
+                
                 await deleteTransactionFromDB(id);
                 await loadTransactions();
+                
+                // Setelah transaksi dihapus, validasi zakat
+                const hadInvalidZakat = validateAndCancelInvalidZakat();
+                
                 render();
-                showToast("Transaksi dihapus");
+                
+                if (isIncome && deletedAmount > 0) {
+                    if (hadInvalidZakat) {
+                        showToast(`⚠️ Transaksi Rp ${formatRupiah(deletedAmount)} dihapus. Zakat terkait telah dibatalkan secara otomatis.`);
+                    } else {
+                        showToast(`Transaksi dihapus. Periksa kembali kewajiban zakat Anda.`);
+                    }
+                } else {
+                    showToast("Transaksi dihapus");
+                }
             });
         }
 
         async function requestClearAll() {
             openPasswordModal(async () => {
-                if(confirm("Hapus semua data? Ini juga akan mereset riwayat zakat.")) {
+                if(confirm("Hapus semua data? Ini akan membatalkan semua riwayat zakat.")) {
                     await clearAllTransactions();
                     localStorage.removeItem('zakatPaymentHistory');
                     await loadTransactions();
@@ -1057,7 +1148,7 @@
                 list.appendChild(div);
             });
 
-            // Operational Card (berdasarkan filter)
+            // Operational Card
             const profitFiltered = ti * 0.2;
             const netFiltered = ti - te;
             const remaining = profitFiltered - te;
@@ -1072,7 +1163,10 @@
             document.getElementById('operationalUsed').innerText = formatRupiah(te);
             document.getElementById('operationalTotal').innerText = formatRupiah(profitFiltered);
             
-            // ZAKAT (berdasarkan total keseluruhan)
+            // Validasi zakat setiap render
+            validateAndCancelInvalidZakat();
+            
+            // ZAKAT
             const totalProfit = getTotalProfit();
             const totalPaidProfit = getTotalProfitZakatPaid();
             const unpaidProfit = getUnpaidProfit();
@@ -1110,12 +1204,16 @@
             
             if (history.length > 0) {
                 previewDiv.style.display = 'flex';
-                const latestHistory = history.slice(-3).reverse();
-                miniList.innerHTML = latestHistory.map(record => `
-                    <span class="history-chip">
-                        🕌 ${formatRupiah(record.zakatPaid)} (${record.date.substring(5,10)})
-                    </span>
-                `).join('');
+                const validHistory = history.filter(h => !h.cancelled).slice(-3).reverse();
+                if (validHistory.length > 0) {
+                    miniList.innerHTML = validHistory.map(record => `
+                        <span class="history-chip">
+                            🕌 ${formatRupiah(record.zakatPaid)} (${record.date.substring(5,10)})
+                        </span>
+                    `).join('');
+                } else {
+                    miniList.innerHTML = '<span class="history-chip" style="background:rgba(220,38,38,0.3);">Semua zakat dibatalkan</span>';
+                }
             } else {
                 previewDiv.style.display = 'none';
             }
@@ -1205,7 +1303,7 @@
             await initDB();
             await loadTransactions();
             render();
-            showToast("✨ Aplikasi siap digunakan | Jangan lupa tunaikan zakat ✨");
+            showToast("✨ Aplikasi siap digunakan | Zakat akan otomatis dibatalkan jika transaksi dihapus ✨");
         }
         initApp();
     </script>
