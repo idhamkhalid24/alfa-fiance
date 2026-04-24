@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Rocky Hijab Finance</title>
+  <title>Rocky Hijab Finance v13</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
@@ -13,7 +13,7 @@
       --green:#176b43;--green2:#0f5132;--gold:#b08a2e;--red:#c0392b;--blue:#2563eb;
       --shadow:0 6px 18px rgba(23,32,21,.07);--r:16px;
     }
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif;font-size:14px}button,input,select,textarea{font:inherit}button{border:0;cursor:pointer} .num{font-family:Arial,Helvetica,sans-serif;font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:-.2px}.app{max-width:440px;margin:0 auto;min-height:100vh;padding:12px 12px 76px}.top{position:sticky;top:0;z-index:10;margin:-12px -12px 10px;padding:12px;background:rgba(246,247,242,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}.brand{display:flex;justify-content:space-between;align-items:center;gap:10px}.brand h1{margin:0;font-size:17px;line-height:1.1}.brand small{display:block;color:var(--muted);font-size:11px;margin-top:2px}.pill{font-size:11px;padding:6px 9px;border-radius:999px;background:#e9f7ef;color:var(--green);font-weight:800;white-space:nowrap}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:12px;margin-bottom:10px}.hero{background:linear-gradient(135deg,var(--green2),var(--green));color:white;border-radius:18px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}.hero .label{opacity:.8;font-size:11px;font-weight:700}.hero .value{font-size:25px;margin:4px 0}.hero .mini{display:flex;justify-content:space-between;gap:8px;font-size:11px;opacity:.9}.stat{padding:11px;background:white;border:1px solid var(--line);border-radius:15px;min-width:0}.stat span{font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:800}.stat b{display:block;margin-top:4px;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.green{color:var(--green)}.red{color:var(--red)}.gold{color:var(--gold)}.blue{color:var(--blue)}.section-title{margin:4px 2px 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:900}.field{margin-bottom:9px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}input,select,textarea{width:100%;border:1px solid var(--line);background:#fbfcf8;border-radius:13px;padding:11px;outline:none;min-height:43px}input:focus,select:focus,textarea:focus{border-color:var(--green)}.amount-wrap{position:relative}.amount-wrap input{font-size:21px;font-weight:900;padding-right:105px}.preview{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--green);font-weight:900;max-width:95px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.btn{width:100%;border-radius:14px;padding:12px 14px;font-weight:900;background:var(--green);color:white;min-height:45px}.btn.secondary{background:#eef2e8;color:var(--ink)}.btn.gold{background:var(--gold)}.btn.red{background:#fff0ee;color:var(--red)}.btn.whatsapp{background:#18a558}.tabs{display:flex;gap:7px;overflow:auto;margin-bottom:10px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{padding:9px 13px;border-radius:999px;background:white;border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:900;white-space:nowrap}.tab.active{background:var(--green);color:white;border-color:var(--green)}.list{display:flex;flex-direction:column;gap:7px}.item{display:flex;justify-content:space-between;align-items:center;gap:10px;background:white;border:1px solid var(--line);border-radius:14px;padding:10px}.item .left{display:flex;align-items:center;gap:9px;min-width:0}.icon{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:900;flex:0 0 30px}.icon.in{background:#e8f7ef;color:var(--green)}.icon.out{background:#fff0ee;color:var(--red)}.desc{min-width:0}.desc b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.desc small{display:block;color:var(--muted);font-size:10px;margin-top:1px}.right{text-align:right;white-space:nowrap}.right b{font-size:13px}.x{background:transparent;color:#b9bfb3;font-size:18px;padding:2px 0 2px 10px}.empty{text-align:center;color:var(--muted);font-size:12px;padding:22px}.nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(440px,100%);background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));z-index:40}.nav button{border-radius:14px;background:transparent;color:var(--muted);font-size:11px;font-weight:900;padding:8px 4px}.nav button.active{background:#e8f7ef;color:var(--green)}.page{display:none}.page.active{display:block}.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:14px}.box{background:white;border-radius:18px;padding:16px;max-width:380px;width:100%;max-height:84vh;overflow:auto}.hidden{display:none!important}.toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);background:#182017;color:white;padding:10px 14px;border-radius:999px;z-index:200;font-size:12px;font-weight:800;max-width:90%;text-align:center}.compact-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.small{font-size:11px;color:var(--muted)}.zakat-mini{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chip{font-size:10px;background:#fff8e5;color:#7c5f13;border:1px solid #f2df9b;border-radius:999px;padding:4px 8px;font-weight:800}.danger-card{background:#fff6f4;border-color:#ffd7d0}.safe-card{background:#f3fbf6;border-color:#ccefd9}.fab{position:fixed;right:calc(50% - 206px);bottom:76px;width:58px;height:58px;border-radius:50%;background:var(--green);color:white;font-size:34px;line-height:1;font-weight:900;box-shadow:0 10px 24px rgba(23,107,67,.32);z-index:60;display:grid;place-items:center}.fab:active{transform:scale(.96)}@media(max-width:440px){.fab{right:16px}}@media(max-width:360px){.app{padding-left:9px;padding-right:9px}.hero .value{font-size:22px}.stat b{font-size:13px}.amount-wrap input{padding-right:80px}.preview{max-width:75px}.row{grid-template-columns:1fr}.grid2{gap:7px}}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif;font-size:14px}button,input,select,textarea{font:inherit}button{border:0;cursor:pointer} .num{font-family:Arial,Helvetica,sans-serif;font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:-.2px}.app{max-width:440px;margin:0 auto;min-height:100vh;padding:12px 12px 76px}.top{position:sticky;top:0;z-index:10;margin:-12px -12px 10px;padding:12px;background:rgba(246,247,242,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}.brand{display:flex;justify-content:space-between;align-items:center;gap:10px}.brand h1{margin:0;font-size:17px;line-height:1.1}.brand small{display:block;color:var(--muted);font-size:11px;margin-top:2px}.pill{font-size:11px;padding:6px 9px;border-radius:999px;background:#e9f7ef;color:var(--green);font-weight:800;white-space:nowrap}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:12px;margin-bottom:10px}.hero{background:linear-gradient(135deg,var(--green2),var(--green));color:white;border-radius:18px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}.hero .label{opacity:.8;font-size:11px;font-weight:700}.hero .value{font-size:25px;margin:4px 0}.hero .mini{display:flex;justify-content:space-between;gap:8px;font-size:11px;opacity:.9}.stat{padding:11px;background:white;border:1px solid var(--line);border-radius:15px;min-width:0}.stat span{font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:800}.stat b{display:block;margin-top:4px;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.green{color:var(--green)}.red{color:var(--red)}.gold{color:var(--gold)}.blue{color:var(--blue)}.section-title{margin:4px 2px 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:900}.field{margin-bottom:9px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}input,select,textarea{width:100%;border:1px solid var(--line);background:#fbfcf8;border-radius:13px;padding:11px;outline:none;min-height:43px}input:focus,select:focus,textarea:focus{border-color:var(--green)}.amount-wrap{position:relative}.amount-wrap input{font-size:21px;font-weight:900;padding-right:105px}.preview{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--green);font-weight:900;max-width:95px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.btn{width:100%;border-radius:14px;padding:12px 14px;font-weight:900;background:var(--green);color:white;min-height:45px}.btn.secondary{background:#eef2e8;color:var(--ink)}.btn.gold{background:var(--gold)}.btn.red{background:#fff0ee;color:var(--red)}.btn.whatsapp{background:#18a558}.tabs{display:flex;gap:7px;overflow:auto;margin-bottom:10px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{padding:9px 13px;border-radius:999px;background:white;border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:900;white-space:nowrap}.tab.active{background:var(--green);color:white;border-color:var(--green)}.list{display:flex;flex-direction:column;gap:7px}.item{display:flex;justify-content:space-between;align-items:center;gap:10px;background:white;border:1px solid var(--line);border-radius:14px;padding:10px}.item .left{display:flex;align-items:center;gap:9px;min-width:0}.icon{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:900;flex:0 0 30px}.icon.in{background:#e8f7ef;color:var(--green)}.icon.out{background:#fff0ee;color:var(--red)}.desc{min-width:0}.desc b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.desc small{display:block;color:var(--muted);font-size:10px;margin-top:1px}.right{text-align:right;white-space:nowrap}.right b{font-size:13px}.x{background:transparent;color:#b9bfb3;font-size:18px;padding:2px 0 2px 10px}.empty{text-align:center;color:var(--muted);font-size:12px;padding:22px}.nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(440px,100%);background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));z-index:40}.nav button{border-radius:14px;background:transparent;color:var(--muted);font-size:11px;font-weight:900;padding:8px 4px}.nav button.active{background:#e8f7ef;color:var(--green)}.page{display:none}.page.active{display:block}.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:14px}.box{background:white;border-radius:18px;padding:16px;max-width:380px;width:100%;max-height:84vh;overflow:auto}.hidden{display:none!important}.toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);background:#182017;color:white;padding:10px 14px;border-radius:999px;z-index:200;font-size:12px;font-weight:800;max-width:90%;text-align:center}.compact-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.small{font-size:11px;color:var(--muted)}.zakat-mini{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chip{font-size:10px;background:#fff8e5;color:#7c5f13;border:1px solid #f2df9b;border-radius:999px;padding:4px 8px;font-weight:800}.danger-card{background:#fff6f4;border-color:#ffd7d0}.safe-card{background:#f3fbf6;border-color:#ccefd9}.fab{position:fixed;right:calc(50% - 206px);bottom:76px;width:58px;height:58px;border-radius:50%;background:var(--green);color:white;font-size:34px;line-height:1;font-weight:900;box-shadow:0 10px 24px rgba(23,107,67,.32);z-index:60;display:grid;place-items:center}.fab:active{transform:scale(.96)}@media(max-width:440px){.fab{right:16px}}@media(max-width:360px){.app{padding-left:9px;padding-right:9px}.hero .value{font-size:22px}.stat b{font-size:13px}.amount-wrap input{padding-right:80px}.preview{max-width:75px}.row{grid-template-columns:1fr}.grid2{gap:7px}}
   
     .firebase-upload-card{background:#eef6ff;border-color:#bfdbfe}
     .firebase-upload-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
@@ -60,7 +60,17 @@
     <div class="top"><div class="brand"><div><h1>Rocky Hijab</h1><small>Finance & Zakat</small></div><div id="statusBadge" class="pill"><span id="statusText">Aman</span></div></div></div>
 
     <section id="pageHome" class="page active">
-      <div class="hero"><div class="label">Saldo Bersih</div><div id="netBalance" class="value num">Rp 0</div><div class="mini"><span>Masuk <b id="totalIncome">Rp 0</b></span><span>Keluar <b id="totalExpense">Rp 0</b></span></div></div>
+      <div class="hero"><div class="label">Saldo Bersih · Semua Data Supabase</div><div id="netBalance" class="value num">Rp 0</div><div class="mini"><span>Masuk <b id="totalIncome">Rp 0</b></span><span>Keluar <b id="totalExpense">Rp 0</b></span></div></div>
+      <div class="card" style="margin-bottom:10px;background:#f3fbf6;border-color:#ccefd9">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div class="section-title" style="margin:0 0 4px;color:var(--green)">Pendapatan Hari Ini</div>
+            <div id="todayFirebaseIncomeHome" class="num green" style="font-size:24px">Rp 0</div>
+            <div id="todayFirebaseIncomeInfo" class="small">Realtime dari Firebase · belum dipotong apapun</div>
+          </div>
+          <span class="lock-badge" style="margin-left:0">FIREBASE</span>
+        </div>
+      </div>
       <div class="grid2">
         <div class="stat"><span>Laba 20%</span><b id="autoProfit" class="blue num">Rp 0</b></div>
         <div class="stat"><span>Total Pengeluaran</span><b id="spendingLimit" class="red num">Rp 0</b></div>
@@ -74,15 +84,31 @@
 
     <section id="pageHistory" class="page">
       <div id="netSummaryCard" class="summary-net-card">
-        <div class="summary-net-head"><div><b>Ringkasan Saldo Bersih</b><small style="display:block">Pemasukan - Pengeluaran</small></div><span class="pill">Supabase</span></div>
+        <div class="summary-net-head"><div><b>Ringkasan Omset Kotor</b><small style="display:block">Total pemasukan sebelum dipotong pengeluaran</small></div><span class="pill">Supabase</span></div>
         <div class="summary-net-grid">
           <div class="summary-net-box"><span>Hari Ini</span><b id="netTodaySummary" class="num green">Rp 0</b></div>
           <div class="summary-net-box"><span>Bulan Ini</span><b id="netMonthSummary" class="num blue">Rp 0</b></div>
           <div class="summary-net-box"><span>Semua</span><b id="netAllSummary" class="num gold">Rp 0</b></div>
         </div>
-        <div id="netSummaryNote" class="small" style="margin-top:8px;color:#2563eb;font-weight:800">Data Firebase hari ini dikunci dulu, masuk ringkasan setelah diupload ke Supabase.</div>
+        <div id="netSummaryNote" class="small" style="margin-top:8px;color:#2563eb;font-weight:800">Omset ini menghitung semua pemasukan yang sudah tersimpan di Supabase, termasuk arsip Firebase yang sudah diupload.</div>
       </div>
       <div class="tabs"><button onclick="changeFilter('today')" id="filter-today" class="tab active">Hari Ini</button><button onclick="changeFilter('month')" id="filter-month" class="tab">Bulan Ini</button><button onclick="changeFilter('range')" id="filter-range" class="tab">Custom</button><button onclick="changeFilter('all')" id="filter-all" class="tab">Semua</button></div>
+      <div class="compact-actions" style="margin-bottom:10px"><button class="btn whatsapp" onclick="sendWhatsAppReport()">Kirim WA</button><button class="btn secondary" onclick="openBackupModal()">Backup</button></div>
+      <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b id="currentPeriodLabel">Riwayat</b><button class="tab" style="color:var(--red)" onclick="requestClearAll()">Reset</button></div><div id="transactionList" class="list"></div></div>
+    </section>
+
+
+    <section id="pageFirebase" class="page">
+      <div class="card" style="background:#eef6ff;border-color:#bfdbfe">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div>
+            <div class="section-title" style="margin:0 0 4px;color:#2563eb">Halaman Firebase</div>
+            <b>Data Kasir Khusus</b>
+            <div class="small">Cek, audit, dan upload omset Firebase ke Supabase. Hari ini tetap dikunci.</div>
+          </div>
+          <span class="pill" style="background:#dbeafe;color:#2563eb">READ ONLY</span>
+        </div>
+      </div>
       <div id="monthValidityCard" class="month-valid-card idle">
         <div class="month-valid-left">
           <div id="monthValidityTitle" class="month-valid-title">Validasi Bulan</div>
@@ -133,12 +159,10 @@
         <div id="pendingUploadSummary" class="audit-box audit-warn" style="margin-top:9px">Pilih rentang tanggal lalu klik Cek Data.</div>
         <div id="pendingUploadList" class="pending-upload-list"></div>
       </div>
-      <div class="compact-actions" style="margin-bottom:10px"><button class="btn whatsapp" onclick="sendWhatsAppReport()">Kirim WA</button><button class="btn secondary" onclick="openBackupModal()">Backup</button></div>
-      <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b id="currentPeriodLabel">Riwayat</b><button class="tab" style="color:var(--red)" onclick="requestClearAll()">Reset</button></div><div id="transactionList" class="list"></div></div>
     </section>
   </main>
   <button class="fab" onclick="openTransactionModal()" aria-label="Input transaksi">+</button>
-  <nav class="nav"><button id="nav-home" class="active" onclick="goPage('home')">Home</button><button id="nav-history" onclick="goPage('history')">Riwayat</button></nav>
+  <nav class="nav"><button id="nav-home" class="active" onclick="goPage('home')">Home</button><button id="nav-history" onclick="goPage('history')">Riwayat</button><button id="nav-firebase" onclick="goPage('firebase')">Firebase</button></nav>
 
 <script>
 const SUPABASE_URL='https://myxrvipyodadnldtomzs.supabase.co';
@@ -153,11 +177,11 @@ const FIREBASE_CONFIG={
   appId:"1:861954349314:web:bb8384825daedb8d34ca1b"
 };
 let supabaseClient=null,transactions=[],zakatHistory=[],currentFilter='today',pendingAction=null,currentPage='home';
-let firebaseDb=null,firebaseUnsub=null,firebaseUploadDate='',firebaseIncomeRows=[],firebaseIncomeTotal=0,pendingFirebaseUploads=[],monthValidityBusy=false;
+let firebaseDb=null,firebaseUnsub=null,todayFirebaseUnsub=null,firebaseUploadDate='',firebaseIncomeRows=[],firebaseIncomeTotal=0,todayFirebaseIncomeRows=[],todayFirebaseIncomeTotal=0,pendingFirebaseUploads=[],monthValidityBusy=false;
 function $(id){return document.getElementById(id)}
 function isSupabaseConfigured(){return SUPABASE_URL&&SUPABASE_ANON_KEY&&!SUPABASE_URL.includes('ISI_')&&!SUPABASE_ANON_KEY.includes('ISI_')}
 function initSupabase(){if(!isSupabaseConfigured()){showToast('Supabase belum disetting');return false}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);return true}
-function goPage(p){currentPage=p;['home','history'].forEach(x=>{ $('page'+x[0].toUpperCase()+x.slice(1)).classList.toggle('active',x===p); $('nav-'+x).classList.toggle('active',x===p)}); if(p==='history') render()}
+function goPage(p){currentPage=p;['home','history','firebase'].forEach(x=>{ $('page'+x[0].toUpperCase()+x.slice(1)).classList.toggle('active',x===p); $('nav-'+x).classList.toggle('active',x===p)}); render(); if(p==='firebase')renderFirebaseUploadCard()}
 function openTransactionModal(){$('inputDate').value=getLocalDateString();$('transactionModal').classList.remove('hidden');setTimeout(()=>$('amount').focus(),80)}
 function closeTransactionModal(){$('transactionModal').classList.add('hidden')}
 function getZakatHistory(){return zakatHistory||[]}
@@ -204,20 +228,21 @@ function changeFilter(f){currentFilter=f;$('rangeSelector').classList.toggle('hi
 async function deleteTransaction(id){const t=transactions.find(x=>Number(x.id)===Number(id));if(t&&isFirebaseUploaded(t)){showToast('Data Firebase LOCK. Update dari tombol Upload, bukan dihapus.');return}openPasswordModal(async()=>{try{await deleteTransactionFromDB(id);await loadTransactions();validateAndCancelInvalidZakat();render();showToast('Transaksi dihapus')}catch(e){showToast('Gagal hapus: '+e.message)}})}
 async function requestClearAll(){openPasswordModal(async()=>{if(confirm('Hapus semua data manual? Data FIREBASE LOCK tidak akan dihapus.')){try{await clearManualTransactions();await saveZakatHistory([]);await loadTransactions();render();showToast('Data manual dihapus. FIREBASE LOCK tetap aman.')}catch(e){showToast('Gagal reset: '+e.message)}}})}
 function formatRupiah(n){return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)}function getActualAmount(raw){if(!raw||isNaN(raw))return 0;return parseFloat(raw)*1000}function handleSmartAmount(input){$('liveAmountPreview').innerText=input.value?formatRupiah(getActualAmount(input.value)):''}function updatePlaceholder(){$('description').placeholder=$('type').value==='expense'?'Contoh: Makan, listrik':'Omset (boleh kosong)'}
-function getNetForRange(mode){
+function getGrossIncomeForRange(mode){
   const today=getLocalDateString(), month=today.slice(0,7);
   const rows=transactions.filter(t=>{
+    if(t.type!=='income')return false;
     if(mode==='today')return t.date===today;
     if(mode==='month')return String(t.date||'').startsWith(month);
     return true;
   });
-  return rows.reduce((sum,t)=>sum+(t.type==='income'?Number(t.amount||0):-Number(t.amount||0)),0);
+  return rows.reduce((sum,t)=>sum+Number(t.amount||0),0);
 }
 function updateNetSummary(){
-  const todayNet=getNetForRange('today'), monthNet=getNetForRange('month'), allNet=getNetForRange('all');
-  if($('netTodaySummary')){$('netTodaySummary').innerText=formatRupiah(todayNet);$('netTodaySummary').className='num '+(todayNet<0?'red':'green')}
-  if($('netMonthSummary')){$('netMonthSummary').innerText=formatRupiah(monthNet);$('netMonthSummary').className='num '+(monthNet<0?'red':'blue')}
-  if($('netAllSummary')){$('netAllSummary').innerText=formatRupiah(allNet);$('netAllSummary').className='num '+(allNet<0?'red':'gold')}
+  const todayGross=getGrossIncomeForRange('today'), monthGross=getGrossIncomeForRange('month'), allGross=getGrossIncomeForRange('all');
+  if($('netTodaySummary')){$('netTodaySummary').innerText=formatRupiah(todayGross);$('netTodaySummary').className='num green'}
+  if($('netMonthSummary')){$('netMonthSummary').innerText=formatRupiah(monthGross);$('netMonthSummary').className='num blue'}
+  if($('netAllSummary')){$('netAllSummary').innerText=formatRupiah(allGross);$('netAllSummary').className='num gold'}
 }
 function getFilteredTransactions(){const now=getLocalDateString(),s=$('filterStartDate').value,e=$('filterEndDate').value;return transactions.filter(t=>currentFilter==='today'?t.date===now:currentFilter==='month'?t.date.startsWith(now.substring(0,7)):currentFilter==='range'?t.date>=s&&t.date<=e:true)}
 function getPeriodLabel(){const now=getLocalDateString();if(currentFilter==='today')return `Hari Ini (${now})`;if(currentFilter==='month')return `Bulan Ini`;if(currentFilter==='range')return `${$('filterStartDate').value} s.d ${$('filterEndDate').value}`;return 'Semua Riwayat'}
@@ -229,6 +254,25 @@ function cleanFirebaseDesc(desc){return String(desc||'').replace(/^\[FIREBASE:\d
 function getFirebaseUploadId(date){return Number(String(date||'').replace(/\D/g,'')+'777')}
 function getUploadedFirebaseTransaction(date){const id=getFirebaseUploadId(date);return transactions.find(t=>Number(t.id)===id || String(t.description||'').startsWith(`[FIREBASE:${date}]`))}
 function initFirebase(){try{if(!window.firebase)return false;if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);firebaseDb=firebase.firestore();return true}catch(e){console.error(e);showToast('Firebase gagal aktif: '+e.message);return false}}
+function renderTodayFirebaseIncomeHome(){
+  const totalEl=$('todayFirebaseIncomeHome'),infoEl=$('todayFirebaseIncomeInfo');
+  if(totalEl)totalEl.innerText=formatRupiah(todayFirebaseIncomeTotal||0);
+  if(infoEl){
+    const c=todayFirebaseIncomeRows.length;
+    infoEl.innerText=c?`${c} transaksi realtime dari Firebase · belum dipotong apapun`:'Realtime dari Firebase · belum ada transaksi hari ini';
+  }
+}
+function startTodayFirebaseWatch(){
+  if(!firebaseDb)return;
+  const today=getLocalDateString();
+  if(todayFirebaseUnsub){todayFirebaseUnsub();todayFirebaseUnsub=null}
+  const q=firebaseDb.collection('transactions').where('dateKey','==',today);
+  todayFirebaseUnsub=q.onSnapshot(snap=>{
+    todayFirebaseIncomeRows=snap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>!t.deleted);
+    todayFirebaseIncomeTotal=todayFirebaseIncomeRows.reduce((a,b)=>a+Number(b.amount||0),0);
+    renderTodayFirebaseIncomeHome();
+  },err=>{console.error(err);if($('todayFirebaseIncomeInfo'))$('todayFirebaseIncomeInfo').innerText='Gagal baca Firebase hari ini';})
+}
 function changeFirebaseUploadDate(date){firebaseUploadDate=date||getLocalDateString();startFirebaseWatch(firebaseUploadDate)}
 function refreshFirebaseUpload(){startFirebaseWatch(firebaseUploadDate||getLocalDateString());showToast('Data Firebase direfresh')}
 function startFirebaseWatch(date){
@@ -472,12 +516,71 @@ async function uploadFirebaseIncome(){
   const date=firebaseUploadDate||getLocalDateString();
   await uploadFirebaseIncomeForDate(date,firebaseIncomeTotal,false);
 }
-function render(){updateNetSummary();const f=getFilteredTransactions();let ti=0,te=0;f.forEach(t=>{if(t.type==='income')ti+=t.amount;else te+=t.amount});const profit=ti*.2,net=ti-te,usage=profit>0?(te/profit)*100:0;$('totalIncome').innerText=formatRupiah(ti);$('totalExpense').innerText=formatRupiah(te);$('autoProfit').innerText=formatRupiah(profit);$('netBalance').innerText=formatRupiah(net);const remainingOps=profit-te;$('spendingLimit').innerText=formatRupiah(te);$('operationalUsed').innerText=formatRupiah(remainingOps);$('operationalTotal').innerText=formatRupiah(profit);const spentEl=$('operationalSpent');if(spentEl)spentEl.innerText=formatRupiah(te);validateAndCancelInvalidZakat();const totalProfit=getTotalProfit(),paid=getTotalProfitZakatPaid(),unpaid=getUnpaidProfit(),due=getCurrentZakatDue();$('zakatAmountLarge').innerText=formatRupiah(due);$('totalProfitDisplay').innerText=formatRupiah(totalProfit);$('totalZakatPaidProfit').innerText=formatRupiah(paid);$('unpaidProfitDisplay').innerText=formatRupiah(unpaid);const pay=$('payZakatBtn'),zs=$('zakatPaymentStatusText');if(totalProfit<=0){zs.innerText='Belum ada laba';pay.disabled=true;pay.style.opacity=.5}else if(due<=0){zs.innerText='Zakat lunas';pay.disabled=true;pay.style.opacity=.5}else{zs.innerText='Wajib dibayar';pay.disabled=false;pay.style.opacity=1}const h=getZakatHistory(),prev=$('zakatHistoryPreview'),mini=$('zakatHistoryMiniList');if(h.length){prev.style.display='flex';const valid=h.filter(x=>!x.cancelled).slice(-2).reverse();mini.innerHTML=valid.length?valid.map(x=>`<span class="chip">${formatRupiah(x.zakatPaid)}</span>`).join(''):'<span class="chip">Zakat batal</span>'}else prev.style.display='none';const over=te>profit&&profit>0;$('operationalCard').className='card '+(over?'danger-card':'safe-card');$('limitWarning').innerText=over?'Over budget: pengeluaran lebih dari 20% omset':'';$('statusText').innerText=over?'Bahaya':'Aman';$('statusBadge').style.background=over?'#fff0ee':'#e9f7ef';$('statusBadge').style.color=over?'#c0392b':'#176b43';$('currentPeriodLabel').innerText=getPeriodLabel();const list=$('transactionList');if(!f.length){list.innerHTML='<div class="empty">Belum ada transaksi</div>';renderFirebaseUploadCard();return}list.innerHTML=f.slice(0,80).map(t=>`<div class="item"><div class="left"><div class="icon ${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'-'}</div><div class="desc"><b>${escapeHtml(cleanFirebaseDesc(t.description))}${isFirebaseUploaded(t)?'<span class="lock-badge">FIREBASE LOCK</span>':''}</b><small>${t.date}</small></div></div><div class="right"><b class="num ${t.type==='income'?'green':'red'}">${t.type==='income'?'+':'-'}${formatRupiah(t.amount).replace('Rp','')}</b>${isFirebaseUploaded(t)?'<div class="small blue" style="font-weight:900">LOCK</div>':`<button class="x" onclick="deleteTransaction(${t.id})">×</button>`}</div></div>`).join('')+(f.length>80?`<div class="empty">Ditampilkan 80 dari ${f.length} data biar ringan</div>`:'');renderFirebaseUploadCard()}
+function getDashboardTransactions(){
+  // Dashboard utama wajib menghitung SEMUA data Supabase yang sudah tersimpan,
+  // termasuk arsip FIREBASE LOCK. Jangan ikut filter Riwayat/Firebase.
+  return transactions || [];
+}
+function render(){
+  updateNetSummary();
+  renderTodayFirebaseIncomeHome();
+
+  // Ringkasan dashboard utama: semua data yang sudah masuk Supabase.
+  // Ini yang membuat Saldo Bersih langsung berubah setelah upload omset Firebase.
+  const dashboardRows=getDashboardTransactions();
+  let totalIn=0,totalOut=0;
+  dashboardRows.forEach(t=>{
+    if(t.type==='income')totalIn+=Number(t.amount||0);
+    else totalOut+=Number(t.amount||0);
+  });
+  const profit=totalIn*.2;
+  const net=totalIn-totalOut;
+  $('totalIncome').innerText=formatRupiah(totalIn);
+  $('totalExpense').innerText=formatRupiah(totalOut);
+  $('autoProfit').innerText=formatRupiah(profit);
+  $('netBalance').innerText=formatRupiah(net);
+  const remainingOps=profit-totalOut;
+  $('spendingLimit').innerText=formatRupiah(totalOut);
+  $('operationalUsed').innerText=formatRupiah(remainingOps);
+  $('operationalTotal').innerText=formatRupiah(profit);
+  const spentEl=$('operationalSpent');if(spentEl)spentEl.innerText=formatRupiah(totalOut);
+
+  validateAndCancelInvalidZakat();
+  const totalProfit=getTotalProfit(),paid=getTotalProfitZakatPaid(),unpaid=getUnpaidProfit(),due=getCurrentZakatDue();
+  $('zakatAmountLarge').innerText=formatRupiah(due);
+  $('totalProfitDisplay').innerText=formatRupiah(totalProfit);
+  $('totalZakatPaidProfit').innerText=formatRupiah(paid);
+  $('unpaidProfitDisplay').innerText=formatRupiah(unpaid);
+  const pay=$('payZakatBtn'),zs=$('zakatPaymentStatusText');
+  if(totalProfit<=0){zs.innerText='Belum ada laba';pay.disabled=true;pay.style.opacity=.5}
+  else if(due<=0){zs.innerText='Zakat lunas';pay.disabled=true;pay.style.opacity=.5}
+  else{zs.innerText='Wajib dibayar';pay.disabled=false;pay.style.opacity=1}
+
+  const h=getZakatHistory(),prev=$('zakatHistoryPreview'),mini=$('zakatHistoryMiniList');
+  if(h.length){prev.style.display='flex';const valid=h.filter(x=>!x.cancelled).slice(-2).reverse();mini.innerHTML=valid.length?valid.map(x=>`<span class="chip">${formatRupiah(x.zakatPaid)}</span>`).join(''):'<span class="chip">Zakat batal</span>'}
+  else prev.style.display='none';
+
+  const over=totalOut>profit&&profit>0;
+  $('operationalCard').className='card '+(over?'danger-card':'safe-card');
+  $('limitWarning').innerText=over?'Over budget: pengeluaran lebih dari 20% omset':'';
+  $('statusText').innerText=over?'Bahaya':'Aman';
+  $('statusBadge').style.background=over?'#fff0ee':'#e9f7ef';
+  $('statusBadge').style.color=over?'#c0392b':'#176b43';
+
+  // List Riwayat tetap mengikuti filter yang sedang dipilih.
+  const f=getFilteredTransactions();
+  $('currentPeriodLabel').innerText=getPeriodLabel();
+  const list=$('transactionList');
+  if(!list){renderFirebaseUploadCard();return}
+  if(!f.length){list.innerHTML='<div class="empty">Belum ada transaksi</div>';renderFirebaseUploadCard();return}
+  list.innerHTML=f.slice(0,80).map(t=>`<div class="item"><div class="left"><div class="icon ${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'-'}</div><div class="desc"><b>${escapeHtml(cleanFirebaseDesc(t.description))}${isFirebaseUploaded(t)?'<span class="lock-badge">FIREBASE LOCK</span>':''}</b><small>${t.date}</small></div></div><div class="right"><b class="num ${t.type==='income'?'green':'red'}">${t.type==='income'?'+':'-'}${formatRupiah(t.amount).replace('Rp','')}</b>${isFirebaseUploaded(t)?'<div class="small blue" style="font-weight:900">LOCK</div>':`<button class="x" onclick="deleteTransaction(${t.id})">×</button>`}</div></div>`).join('')+(f.length>80?`<div class="empty">Ditampilkan 80 dari ${f.length} data biar ringan</div>`:'');
+  renderFirebaseUploadCard();
+}
 function escapeHtml(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function openBackupModal(){if(!transactions.length){showToast('Data kosong');return}$('backupOptionModal').classList.remove('hidden')}function closeBackupModal(){$('backupOptionModal').classList.add('hidden')}function showImportModal(){closeBackupModal();$('importModal').classList.remove('hidden')}function closeImportModal(){$('importModal').classList.add('hidden');$('importDataText').value=''}function exportToFile(){const blob=new Blob([JSON.stringify(transactions,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`rocky_backup_${getLocalDateString()}.json`;a.click();URL.revokeObjectURL(url);closeBackupModal();showToast('Backup tersimpan')}function copyToClipboard(){navigator.clipboard.writeText(JSON.stringify(transactions)).then(()=>{closeBackupModal();showToast('Data disalin')}).catch(()=>showToast('Gagal salin'))}
 async function importFromText(){try{const raw=$('importDataText').value.trim();if(!raw){showToast('Data kosong');return}const imported=JSON.parse(raw);if(!Array.isArray(imported))throw new Error('format');const ok=imported.every(i=>i.id&&i.date&&i.description&&typeof i.amount==='number'&&(i.type==='income'||i.type==='expense'));if(!ok)throw new Error('format');await importTransactions(imported);await loadTransactions();render();closeImportModal();showToast('Import berhasil')}catch(e){showToast('Format JSON salah')}}
 function showToast(message,duration=2600){const old=document.querySelector('.toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=message;document.body.appendChild(t);setTimeout(()=>t.remove(),duration)}
-async function initApp(){try{if(!initSupabase())return;initFirebase();await loadTransactions();await loadZakatHistory();render();if(firebaseDb)startFirebaseWatch(firebaseUploadDate||getLocalDateString());showToast('Supabase tersambung')}catch(e){console.error(e);showToast('Gagal konek: '+e.message,6000)}}initApp();
+async function initApp(){try{if(!initSupabase())return;initFirebase();await loadTransactions();await loadZakatHistory();render();if(firebaseDb){startFirebaseWatch(firebaseUploadDate||getLocalDateString());startTodayFirebaseWatch();}showToast('Supabase tersambung')}catch(e){console.error(e);showToast('Gagal konek: '+e.message,6000)}}initApp();
 </script>
 </body>
 </html>
