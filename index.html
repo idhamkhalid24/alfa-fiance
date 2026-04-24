@@ -26,12 +26,12 @@
     <section id="pageHome" class="page active">
       <div class="hero"><div class="label">Saldo Bersih</div><div id="netBalance" class="value num">Rp 0</div><div class="mini"><span>Masuk <b id="totalIncome">Rp 0</b></span><span>Keluar <b id="totalExpense">Rp 0</b></span></div></div>
       <div class="card sync-card">
-        <div class="section-title" style="margin:0 0 8px">Sync Omset Firebase</div>
+        <div class="section-title" style="margin:0 0 8px">Omset Firebase Realtime</div>
         <div class="row">
           <input type="date" id="firebaseSyncDate">
-          <button class="btn blue" onclick="syncFirebaseBySelectedDate()">Sync</button>
+          <button class="btn blue" onclick="syncFirebaseBySelectedDate()">Cek Tanggal</button>
         </div>
-        <div id="firebaseSyncStatus" class="sync-note">Data Firebase hanya dibaca, lalu masuk ke Kas Pribadi sebagai pendapatan bertanda FIREBASE.</div>
+        <div id="firebaseSyncStatus" class="sync-note">Data Firebase tampil realtime sebagai pendapatan read-only. Tidak disimpan, tidak bisa diedit, dan tidak bisa dihapus dari Kas Pribadi.</div>
       </div>
       <div class="grid2">
         <div class="stat"><span>Laba 20%</span><b id="autoProfit" class="blue num">Rp 0</b></div>
@@ -59,6 +59,7 @@ const SUPABASE_URL='https://myxrvipyodadnldtomzs.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_aG-kyasJNCEk2U9fN5T4qg_GfY0FpPH';
 const OWNER_ID='rocky-hijab'; const APP_PASSWORD='170845';
 let supabaseClient=null,transactions=[],zakatHistory=[],currentFilter='today',pendingAction=null,currentPage='home';
+let firebaseOmsetByDate={},firebaseTrxCountByDate={},firebaseReady=false;
 function $(id){return document.getElementById(id)}
 function isSupabaseConfigured(){return SUPABASE_URL&&SUPABASE_ANON_KEY&&!SUPABASE_URL.includes('ISI_')&&!SUPABASE_ANON_KEY.includes('ISI_')}
 function initSupabase(){if(!isSupabaseConfigured()){showToast('Supabase belum disetting');return false}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);return true}
@@ -68,7 +69,7 @@ function closeTransactionModal(){$('transactionModal').classList.add('hidden')}
 function getZakatHistory(){return zakatHistory||[]}
 async function loadZakatHistory(){if(!supabaseClient)return[];const{data,error}=await supabaseClient.from('zakat_history').select('*').eq('owner_id',OWNER_ID).order('id',{ascending:true});if(error)throw error;zakatHistory=(data||[]).map(r=>({id:Number(r.id),date:r.date,profitAtPayment:Number(r.profit_at_payment||0),zakatPaid:Number(r.zakat_paid||0),cancelled:!!r.cancelled,cancelledAt:r.cancelled_at,note:r.note||''}));return zakatHistory}
 async function saveZakatHistory(history){zakatHistory=history;if(!supabaseClient)return;const del=await supabaseClient.from('zakat_history').delete().eq('owner_id',OWNER_ID);if(del.error)throw del.error;if(!history.length)return;const rows=history.map(r=>({id:r.id,owner_id:OWNER_ID,date:r.date,profit_at_payment:r.profitAtPayment,zakat_paid:r.zakatPaid,cancelled:!!r.cancelled,cancelled_at:r.cancelledAt||null,note:r.note||''}));const ins=await supabaseClient.from('zakat_history').insert(rows);if(ins.error)throw ins.error}
-function getTotalProfit(){let total=0;transactions.forEach(t=>{if(t.type==='income')total+=t.amount});return total*.2}
+function getTotalProfit(){let total=0;getAllTransactionsForView().forEach(t=>{if(t.type==='income')total+=t.amount});return total*.2}
 function getTotalProfitZakatPaid(){return getZakatHistory().reduce((a,r)=>a+(!r.cancelled?r.profitAtPayment:0),0)}
 function getUnpaidProfit(){return Math.max(0,getTotalProfit()-getTotalProfitZakatPaid())}
 function getCurrentZakatDue(){return getUnpaidProfit()*.025}
@@ -76,8 +77,25 @@ function validateAndCancelInvalidZakat(){const totalProfit=getTotalProfit();let 
 async function markZakatPaid(){const due=getCurrentZakatDue();if(due<=0){showToast('Zakat sudah lunas');return}const unpaid=getUnpaidProfit();const now=new Date();const ds=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;if(confirm(`Bayar zakat ${formatRupiah(due)} dari laba ${formatRupiah(unpaid)}?`)){const h=getZakatHistory();h.push({id:Date.now(),date:ds,profitAtPayment:unpaid,zakatPaid:due,cancelled:false,note:`Zakat dari laba ${formatRupiah(unpaid)}`});try{await saveZakatHistory(h);render();showToast('Zakat tersimpan')}catch(e){showToast('Gagal simpan zakat: '+e.message)}}}
 function showZakatHistoryModal(){const h=getZakatHistory(),box=$('zakatHistoryList');box.innerHTML=h.length?h.slice().reverse().map(r=>`<div class="item ${r.cancelled?'danger-card':''}"><div class="desc"><b>${r.date} ${r.cancelled?'(Batal)':''}</b><small>Dari laba ${formatRupiah(r.profitAtPayment)}</small></div><b class="num ${r.cancelled?'red':'gold'}">${formatRupiah(r.zakatPaid)}</b></div>`).join(''):'<div class="empty">Belum ada riwayat zakat</div>';$('zakatHistoryModal').classList.remove('hidden')}
 function closeZakatHistoryModal(){$('zakatHistoryModal').classList.add('hidden')}
-async function loadTransactions(){const{data,error}=await supabaseClient.from('transactions').select('*').eq('owner_id',OWNER_ID).order('date',{ascending:false}).order('id',{ascending:false});if(error)throw error;transactions=(data||[]).map(r=>({id:Number(r.id),date:r.date,description:r.description,amount:Number(r.amount||0),type:r.type}));return transactions}
-async function saveTransaction(t){const{error}=await supabaseClient.from('transactions').insert({...t,owner_id:OWNER_ID});if(error)throw error}
+async function loadTransactions(){const{data,error}=await supabaseClient.from('transactions').select('*').eq('owner_id',OWNER_ID).order('date',{ascending:false}).order('id',{ascending:false});if(error)throw error;transactions=(data||[]).map(r=>({id:Number(r.id),date:r.date,description:r.description,amount:Number(r.amount||0),type:r.type})).filter(t=>!isFirebaseSyncedTransaction(t));return transactions}
+async function saveTransaction(t){
+  if(!supabaseClient) throw new Error('Supabase belum siap');
+  const row={
+    id:Number(t.id||Date.now()),
+    owner_id:OWNER_ID,
+    date:t.date,
+    description:String(t.description||'Transaksi'),
+    amount:Number(t.amount||0),
+    type:t.type
+  };
+  let {error}=await supabaseClient.from('transactions').insert(row);
+  if(error && String(error.message||'').toLowerCase().includes('duplicate')){
+    row.id=Date.now()+Math.floor(Math.random()*999);
+    const retry=await supabaseClient.from('transactions').insert(row);
+    error=retry.error;
+  }
+  if(error) throw error;
+}
 async function deleteTransactionFromDB(id){const{error}=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID).eq('id',id);if(error)throw error}
 async function clearAllTransactions(){const{error}=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID);if(error)throw error}
 async function importTransactions(newTransactions){await clearAllTransactions();if(!newTransactions.length)return;const rows=newTransactions.map(t=>({id:t.id,owner_id:OWNER_ID,date:t.date,description:t.description,amount:t.amount,type:t.type}));const{error}=await supabaseClient.from('transactions').insert(rows);if(error)throw error}
@@ -86,35 +104,24 @@ $('inputDate').value=getLocalDateString();$('filterStartDate').value=getLocalDat
 function openPasswordModal(cb){pendingAction=cb;$('passwordModal').classList.remove('hidden');$('confirmPasswordInput').value=''}function closePasswordModal(){$('passwordModal').classList.add('hidden');pendingAction=null}$('btnConfirmAction').addEventListener('click',()=>{if($('confirmPasswordInput').value===APP_PASSWORD){const a=pendingAction;closePasswordModal();if(a)a()}else{showToast('Sandi salah');$('confirmPasswordInput').value=''}});
 
 function getFirebaseSyncId(date){return Number(String(date||'').replace(/\D/g,'')+'77')}
-function isFirebaseSyncedTransaction(t){return !!t && (String(t.description||'').toLowerCase().includes('firebase') || Number(t.id)===getFirebaseSyncId(t.date))}
+function isFirebaseLiveTransaction(t){return !!t && t.source==='firebase_live'}
+function isFirebaseSyncedTransaction(t){return !!t && (isFirebaseLiveTransaction(t) || String(t.description||'').toLowerCase().includes('firebase') || Number(t.id)===getFirebaseSyncId(t.date))}
 function cleanFirebaseDescription(desc){return String(desc||'').replace(/\s*\[?FIREBASE\]?\s*/ig,' ').replace(/\s+/g,' ').trim()}
-async function saveFirebaseOmsetToSupabase(date,total,count){
-  if(!supabaseClient)throw new Error('Supabase belum siap');
-  const amount=Math.round(Number(total||0));
-  const id=getFirebaseSyncId(date);
-  const desc=`Omset Kasir Firebase${count?` (${count} trx)`:''}`;
-  const row={id,owner_id:OWNER_ID,date,description:desc,amount,type:'income'};
-  const res=await supabaseClient.from('transactions').upsert(row,{onConflict:'id'});
-  if(res.error)throw res.error;
-  await loadTransactions();render();
-  showToast(`Omset Firebase ${date}: ${formatRupiah(amount)}`);
-  const st=$('firebaseSyncStatus');if(st)st.innerText=`Terakhir sync ${date}: ${formatRupiah(amount)} dari ${count||0} transaksi Firebase.`;
-}
-async function syncFirebaseBySelectedDate(){
-  const date=($('firebaseSyncDate')&&$('firebaseSyncDate').value)||getLocalDateString();
-  if(!window.syncFirebaseOmsetByDate){showToast('Firebase belum siap');return}
-  try{const st=$('firebaseSyncStatus');if(st)st.innerText='Mengambil omset dari Firebase...';await window.syncFirebaseOmsetByDate(date)}catch(e){console.error(e);showToast('Gagal sync Firebase: '+e.message,5000);const st=$('firebaseSyncStatus');if(st)st.innerText='Gagal sync: '+e.message}
-}
-async function addTransaction(){try{const dateVal=$('inputDate').value,type=$('type').value;let desc=$('description').value.trim();const amount=getActualAmount($('amount').value);if(type==='income'&&!desc)desc='Omset';if(type==='expense'&&!desc){showToast('Deskripsi pengeluaran wajib');return}if(!dateVal||amount<=0){showToast('Nominal tidak valid');return}await saveTransaction({id:Date.now(),date:dateVal,description:desc,amount,type});await loadTransactions();render();$('description').value='';$('amount').value='';$('liveAmountPreview').innerText='';$('inputDate').value=getLocalDateString();closeTransactionModal();showToast('Transaksi tersimpan');goPage('home')}catch(e){showToast('Gagal simpan: '+e.message)}}
+function getFirebaseLiveTransactions(){return Object.keys(firebaseOmsetByDate).sort().reverse().map(date=>({id:`fb_${date}`,date,description:`Omset Kasir Realtime`,amount:Math.round(Number(firebaseOmsetByDate[date]||0)),type:'income',source:'firebase_live',count:firebaseTrxCountByDate[date]||0})).filter(t=>t.amount>0)}
+function getAllTransactionsForView(){return [...getFirebaseLiveTransactions(),...transactions].sort((a,b)=>String(b.date).localeCompare(String(a.date)))}
+function updateFirebaseStatus(date){const st=$('firebaseSyncStatus');if(!st)return;const d=date||(($('firebaseSyncDate')&&$('firebaseSyncDate').value)||getLocalDateString());const total=Number(firebaseOmsetByDate[d]||0),count=Number(firebaseTrxCountByDate[d]||0);st.innerText=firebaseReady?`Realtime ${d}: ${formatRupiah(total)} dari ${count} transaksi Firebase. Data ini read-only dan tidak bisa dihapus/edit di Kas Pribadi.`:'Menghubungkan realtime Firebase...'}
+window.setFirebaseLiveOmsets=function(omsets,counts){firebaseOmsetByDate=omsets||{};firebaseTrxCountByDate=counts||{};firebaseReady=true;updateFirebaseStatus();render()}
+async function syncFirebaseBySelectedDate(){const date=($('firebaseSyncDate')&&$('firebaseSyncDate').value)||getLocalDateString();updateFirebaseStatus(date);showToast('Data Firebase sudah realtime read-only')}
+async function addTransaction(){try{const dateVal=$('inputDate').value,type=$('type').value;let desc=$('description').value.trim();const amount=getActualAmount($('amount').value);if(type==='income'&&!desc)desc='Omset';if(type==='expense'&&!desc){showToast('Deskripsi pengeluaran wajib');return}if(!dateVal||amount<=0){showToast('Nominal tidak valid');return}await saveTransaction({id:Date.now()+Math.floor(Math.random()*999),date:dateVal,description:desc,amount,type});await loadTransactions();render();$('description').value='';$('amount').value='';$('liveAmountPreview').innerText='';$('inputDate').value=getLocalDateString();closeTransactionModal();showToast('Transaksi tersimpan');goPage('home')}catch(e){console.error(e);showToast('Gagal simpan: '+(e.message||e),6000)}}
 function changeFilter(f){currentFilter=f;$('rangeSelector').classList.toggle('hidden',f!=='range');updateFilterUI();render()}function updateFilterUI(){['today','month','range','all'].forEach(f=>{const el=$('filter-'+f);if(el)el.classList.toggle('active',f===currentFilter)})}
-async function deleteTransaction(id){const trx=transactions.find(t=>Number(t.id)===Number(id));if(isFirebaseSyncedTransaction(trx)&&!confirm('Ini pendapatan hasil sync Firebase. Kalau terhapus, bisa sync ulang tanggal yang sama. Lanjut hapus dari Kas Pribadi?'))return;openPasswordModal(async()=>{try{await deleteTransactionFromDB(id);await loadTransactions();validateAndCancelInvalidZakat();render();showToast('Transaksi dihapus')}catch(e){showToast('Gagal hapus: '+e.message)}})}
+async function deleteTransaction(id){const trx=getAllTransactionsForView().find(t=>String(t.id)===String(id));if(isFirebaseLiveTransaction(trx)){showToast('Data Firebase realtime tidak bisa dihapus dari Kas Pribadi');return}openPasswordModal(async()=>{try{await deleteTransactionFromDB(id);await loadTransactions();validateAndCancelInvalidZakat();render();showToast('Transaksi dihapus')}catch(e){showToast('Gagal hapus: '+e.message)}})}
 async function requestClearAll(){openPasswordModal(async()=>{if(confirm('Hapus semua data?')){try{await clearAllTransactions();await saveZakatHistory([]);await loadTransactions();render();showToast('Semua data dihapus')}catch(e){showToast('Gagal reset: '+e.message)}}})}
 function formatRupiah(n){return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)}function getActualAmount(raw){if(!raw||isNaN(raw))return 0;return parseFloat(raw)*1000}function handleSmartAmount(input){$('liveAmountPreview').innerText=input.value?formatRupiah(getActualAmount(input.value)):''}function updatePlaceholder(){$('description').placeholder=$('type').value==='expense'?'Contoh: Makan, listrik':'Omset (boleh kosong)'}
-function getFilteredTransactions(){const now=getLocalDateString(),s=$('filterStartDate').value,e=$('filterEndDate').value;return transactions.filter(t=>currentFilter==='today'?t.date===now:currentFilter==='month'?t.date.startsWith(now.substring(0,7)):currentFilter==='range'?t.date>=s&&t.date<=e:true)}
+function getFilteredTransactions(){const now=getLocalDateString(),s=$('filterStartDate').value,e=$('filterEndDate').value;return getAllTransactionsForView().filter(t=>currentFilter==='today'?t.date===now:currentFilter==='month'?t.date.startsWith(now.substring(0,7)):currentFilter==='range'?t.date>=s&&t.date<=e:true)}
 function getPeriodLabel(){const now=getLocalDateString();if(currentFilter==='today')return `Hari Ini (${now})`;if(currentFilter==='month')return `Bulan Ini`;if(currentFilter==='range')return `${$('filterStartDate').value} s.d ${$('filterEndDate').value}`;return 'Semua Riwayat'}
 function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else{te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});let r=`📊 *LAPORAN ROCKY HIJAB*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20%: ${formatRupiah(ti*.2)}\n🕌 Zakat wajib: ${formatRupiah(getCurrentZakatDue())}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari Rocky Hijab Finance_'}
 function sendWhatsAppReport(){if(!getFilteredTransactions().length){showToast('Tidak ada transaksi');return}const no=prompt('Nomor WhatsApp tujuan. Kosongkan untuk copy laporan.','');const report=generateWhatsAppReport();if(no&&no.trim()){let n=no.replace(/[^0-9]/g,'');if(n.startsWith('0'))n='62'+n.slice(1);if(!n.startsWith('62'))n='62'+n;window.open(`https://wa.me/${n}?text=${encodeURIComponent(report)}`,'_blank');showToast('Membuka WhatsApp')}else{navigator.clipboard.writeText(report).then(()=>showToast('Laporan disalin')).catch(()=>showToast('Gagal salin'))}}
-function render(){const f=getFilteredTransactions();let ti=0,te=0;f.forEach(t=>{if(t.type==='income')ti+=t.amount;else te+=t.amount});const profit=ti*.2,net=ti-te,usage=profit>0?(te/profit)*100:0;$('totalIncome').innerText=formatRupiah(ti);$('totalExpense').innerText=formatRupiah(te);$('autoProfit').innerText=formatRupiah(profit);$('netBalance').innerText=formatRupiah(net);const remainingOps=profit-te;$('spendingLimit').innerText=formatRupiah(te);$('operationalUsed').innerText=formatRupiah(remainingOps);$('operationalTotal').innerText=formatRupiah(profit);const spentEl=$('operationalSpent');if(spentEl)spentEl.innerText=formatRupiah(te);validateAndCancelInvalidZakat();const totalProfit=getTotalProfit(),paid=getTotalProfitZakatPaid(),unpaid=getUnpaidProfit(),due=getCurrentZakatDue();$('zakatAmountLarge').innerText=formatRupiah(due);$('totalProfitDisplay').innerText=formatRupiah(totalProfit);$('totalZakatPaidProfit').innerText=formatRupiah(paid);$('unpaidProfitDisplay').innerText=formatRupiah(unpaid);const pay=$('payZakatBtn'),zs=$('zakatPaymentStatusText');if(totalProfit<=0){zs.innerText='Belum ada laba';pay.disabled=true;pay.style.opacity=.5}else if(due<=0){zs.innerText='Zakat lunas';pay.disabled=true;pay.style.opacity=.5}else{zs.innerText='Wajib dibayar';pay.disabled=false;pay.style.opacity=1}const h=getZakatHistory(),prev=$('zakatHistoryPreview'),mini=$('zakatHistoryMiniList');if(h.length){prev.style.display='flex';const valid=h.filter(x=>!x.cancelled).slice(-2).reverse();mini.innerHTML=valid.length?valid.map(x=>`<span class="chip">${formatRupiah(x.zakatPaid)}</span>`).join(''):'<span class="chip">Zakat batal</span>'}else prev.style.display='none';const over=te>profit&&profit>0;$('operationalCard').className='card '+(over?'danger-card':'safe-card');$('limitWarning').innerText=over?'Over budget: pengeluaran lebih dari 20% omset':'';$('statusText').innerText=over?'Bahaya':'Aman';$('statusBadge').style.background=over?'#fff0ee':'#e9f7ef';$('statusBadge').style.color=over?'#c0392b':'#176b43';$('currentPeriodLabel').innerText=getPeriodLabel();const list=$('transactionList');if(!f.length){list.innerHTML='<div class="empty">Belum ada transaksi</div>';return}list.innerHTML=f.slice(0,80).map(t=>{const fb=isFirebaseSyncedTransaction(t);return `<div class="item ${fb?'sync-card':''}"><div class="left"><div class="icon ${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'-'}</div><div class="desc"><b>${escapeHtml(cleanFirebaseDescription(t.description))}</b><small>${t.date}${fb?' <span class="chip-firebase">DARI FIREBASE</span>':''}</small></div></div><div class="right"><b class="num ${t.type==='income'?'green':'red'}">${t.type==='income'?'+':'-'}${formatRupiah(t.amount).replace('Rp','')}</b><button class="x" onclick="deleteTransaction(${t.id})">×</button></div></div>`}).join('')+(f.length>80?`<div class="empty">Ditampilkan 80 dari ${f.length} data biar ringan</div>`:'')}
+function render(){const f=getFilteredTransactions();let ti=0,te=0;f.forEach(t=>{if(t.type==='income')ti+=t.amount;else te+=t.amount});const profit=ti*.2,net=ti-te,usage=profit>0?(te/profit)*100:0;$('totalIncome').innerText=formatRupiah(ti);$('totalExpense').innerText=formatRupiah(te);$('autoProfit').innerText=formatRupiah(profit);$('netBalance').innerText=formatRupiah(net);const remainingOps=profit-te;$('spendingLimit').innerText=formatRupiah(te);$('operationalUsed').innerText=formatRupiah(remainingOps);$('operationalTotal').innerText=formatRupiah(profit);const spentEl=$('operationalSpent');if(spentEl)spentEl.innerText=formatRupiah(te);validateAndCancelInvalidZakat();const totalProfit=getTotalProfit(),paid=getTotalProfitZakatPaid(),unpaid=getUnpaidProfit(),due=getCurrentZakatDue();$('zakatAmountLarge').innerText=formatRupiah(due);$('totalProfitDisplay').innerText=formatRupiah(totalProfit);$('totalZakatPaidProfit').innerText=formatRupiah(paid);$('unpaidProfitDisplay').innerText=formatRupiah(unpaid);const pay=$('payZakatBtn'),zs=$('zakatPaymentStatusText');if(totalProfit<=0){zs.innerText='Belum ada laba';pay.disabled=true;pay.style.opacity=.5}else if(due<=0){zs.innerText='Zakat lunas';pay.disabled=true;pay.style.opacity=.5}else{zs.innerText='Wajib dibayar';pay.disabled=false;pay.style.opacity=1}const h=getZakatHistory(),prev=$('zakatHistoryPreview'),mini=$('zakatHistoryMiniList');if(h.length){prev.style.display='flex';const valid=h.filter(x=>!x.cancelled).slice(-2).reverse();mini.innerHTML=valid.length?valid.map(x=>`<span class="chip">${formatRupiah(x.zakatPaid)}</span>`).join(''):'<span class="chip">Zakat batal</span>'}else prev.style.display='none';const over=te>profit&&profit>0;$('operationalCard').className='card '+(over?'danger-card':'safe-card');$('limitWarning').innerText=over?'Over budget: pengeluaran lebih dari 20% omset':'';$('statusText').innerText=over?'Bahaya':'Aman';$('statusBadge').style.background=over?'#fff0ee':'#e9f7ef';$('statusBadge').style.color=over?'#c0392b':'#176b43';$('currentPeriodLabel').innerText=getPeriodLabel();const list=$('transactionList');if(!f.length){list.innerHTML='<div class="empty">Belum ada transaksi</div>';return}list.innerHTML=f.slice(0,80).map(t=>{const fb=isFirebaseSyncedTransaction(t);return `<div class="item ${fb?'sync-card':''}"><div class="left"><div class="icon ${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'-'}</div><div class="desc"><b>${escapeHtml(cleanFirebaseDescription(t.description))}</b><small>${t.date}${fb?' <span class="chip-firebase">DARI FIREBASE</span>':''}</small></div></div><div class="right"><b class="num ${t.type==='income'?'green':'red'}">${t.type==='income'?'+':'-'}${formatRupiah(t.amount).replace('Rp','')}</b>${isFirebaseLiveTransaction(t)?'<span class="chip-firebase" style="margin-left:6px">LOCK</span>':`<button class="x" onclick="deleteTransaction(${t.id})">×</button>`}</div></div>`}).join('')+(f.length>80?`<div class="empty">Ditampilkan 80 dari ${f.length} data biar ringan</div>`:'')}
 function escapeHtml(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function openBackupModal(){if(!transactions.length){showToast('Data kosong');return}$('backupOptionModal').classList.remove('hidden')}function closeBackupModal(){$('backupOptionModal').classList.add('hidden')}function showImportModal(){closeBackupModal();$('importModal').classList.remove('hidden')}function closeImportModal(){$('importModal').classList.add('hidden');$('importDataText').value=''}function exportToFile(){const blob=new Blob([JSON.stringify(transactions,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`rocky_backup_${getLocalDateString()}.json`;a.click();URL.revokeObjectURL(url);closeBackupModal();showToast('Backup tersimpan')}function copyToClipboard(){navigator.clipboard.writeText(JSON.stringify(transactions)).then(()=>{closeBackupModal();showToast('Data disalin')}).catch(()=>showToast('Gagal salin'))}
 async function importFromText(){try{const raw=$('importDataText').value.trim();if(!raw){showToast('Data kosong');return}const imported=JSON.parse(raw);if(!Array.isArray(imported))throw new Error('format');const ok=imported.every(i=>i.id&&i.date&&i.description&&typeof i.amount==='number'&&(i.type==='income'||i.type==='expense'));if(!ok)throw new Error('format');await importTransactions(imported);await loadTransactions();render();closeImportModal();showToast('Import berhasil')}catch(e){showToast('Format JSON salah')}}
@@ -124,7 +131,7 @@ async function initApp(){try{if(!initSupabase())return;await loadTransactions();
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-  import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAqmTEKnLKOXcmOoR9RrXksNe5_Fix42w8",
@@ -138,23 +145,35 @@ async function initApp(){try{if(!initSupabase())return;await loadTransactions();
   const fbApp = initializeApp(firebaseConfig, 'rocky-finance-readonly');
   const fbDb = getFirestore(fbApp);
 
-  window.syncFirebaseOmsetByDate = async function(dateKey){
-    const q = query(collection(fbDb, 'transactions'), where('dateKey', '==', dateKey));
-    const snap = await getDocs(q);
-    let total = 0;
-    let count = 0;
+  function getDateKey(t){
+    if (t.dateKey) return String(t.dateKey).slice(0,10);
+    if (t.createdAt?.toDate) return t.createdAt.toDate().toLocaleDateString('en-CA', { timeZone:'Asia/Jakarta' });
+    if (t.createdAtMs) return new Date(Number(t.createdAtMs)).toLocaleDateString('en-CA', { timeZone:'Asia/Jakarta' });
+    if (typeof t.time === 'string' && t.time.length >= 10) return t.time.slice(0,10);
+    return '';
+  }
+
+  onSnapshot(collection(fbDb, 'transactions'), (snap) => {
+    const omsets = {};
+    const counts = {};
     snap.forEach(docSnap => {
       const t = docSnap.data() || {};
       if (t.deleted === true || t.deleted === 'true') return;
-      total += Number(t.amount || 0);
-      count += 1;
+      const dateKey = getDateKey(t);
+      if (!dateKey) return;
+      omsets[dateKey] = (omsets[dateKey] || 0) + Number(t.amount || 0);
+      counts[dateKey] = (counts[dateKey] || 0) + 1;
     });
-    await window.saveFirebaseOmsetToSupabase(dateKey, total, count);
-  };
+    if (window.setFirebaseLiveOmsets) window.setFirebaseLiveOmsets(omsets, counts);
+  }, (err) => {
+    console.error('Firebase realtime error:', err);
+    const st = document.getElementById('firebaseSyncStatus');
+    if (st) st.innerText = 'Gagal realtime Firebase: ' + (err.message || err);
+  });
 
   setTimeout(() => {
     const st = document.getElementById('firebaseSyncStatus');
-    if (st) st.innerText = 'Siap sync. Firebase mode read-only: hanya ambil omset, tidak bisa edit/hapus data kasir.';
+    if (st) st.innerText = 'Menghubungkan realtime Firebase read-only...';
   }, 500);
 </script>
 </body>
