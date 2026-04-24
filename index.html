@@ -55,12 +55,13 @@
   <div id="zakatHistoryModal" class="modal hidden"><div class="box"><h3 style="margin:0 0 12px;text-align:center">Riwayat Zakat</h3><div id="zakatHistoryList"></div><button class="btn gold" onclick="closeZakatHistoryModal()" style="margin-top:12px">Tutup</button></div></div>
   <div id="backupOptionModal" class="modal hidden"><div class="box"><h3 style="margin:0 0 12px;text-align:center">Backup</h3><div class="compact-actions"><button class="btn secondary" onclick="exportToFile()">File JSON</button><button class="btn secondary" onclick="copyToClipboard()">Salin</button><button class="btn secondary" onclick="showImportModal()">Import</button><button class="btn secondary" onclick="closeBackupModal()">Tutup</button></div></div></div>
   <div id="importModal" class="modal hidden"><div class="box"><h3 style="margin:0 0 12px;text-align:center">Import JSON</h3><textarea id="importDataText" rows="7" placeholder="Tempel data JSON di sini..."></textarea><div class="row" style="margin-top:10px"><button class="btn secondary" onclick="closeImportModal()">Batal</button><button class="btn" onclick="importFromText()">Import</button></div></div></div>
+  <div id="expenseListModal" class="modal hidden"><div class="box" style="max-width:420px;width:100%"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px"><div><h3 style="margin:0;font-size:16px">Semua Pengeluaran</h3><small id="expenseListSubtitle" style="color:var(--muted);font-size:11px;font-weight:800"></small></div><button class="x" style="font-size:22px;padding:4px 6px" onclick="closeExpenseListModal()">×</button></div><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fff0ee;border-radius:13px;margin-bottom:12px"><span style="font-size:12px;font-weight:900;color:var(--red)">Total Pengeluaran</span><b id="expenseListTotal" class="num red" style="font-size:16px">Rp 0</b></div><div id="expenseListContent" class="list" style="max-height:55vh;overflow-y:auto"></div><button class="btn secondary" onclick="closeExpenseListModal()" style="margin-top:12px">Tutup</button></div></div>
 
   <main class="app">
     <div class="top"><div class="brand"><div><h1>Rocky Hijab</h1><small>Finance & Zakat</small></div><div id="statusBadge" class="pill"><span id="statusText">Aman</span></div></div></div>
 
     <section id="pageHome" class="page active">
-      <div class="hero"><div class="label">Saldo Bersih · Semua Data Supabase</div><div id="netBalance" class="value num">Rp 0</div><div class="mini"><span>Masuk <b id="totalIncome">Rp 0</b></span><span>Keluar <b id="totalExpense">Rp 0</b></span></div></div>
+      <div class="hero"><div class="label">Saldo Bersih · Semua Data Supabase</div><div id="netBalance" class="value num">Rp 0</div><div class="mini"><span>Masuk <b id="totalIncome">Rp 0</b></span><span>Keluar <b id="totalExpense" onclick="showExpenseListModal()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">Rp 0</b></span></div></div>
       <div class="card" style="margin-bottom:10px;background:#f3fbf6;border-color:#ccefd9">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div>
@@ -73,7 +74,7 @@
       </div>
       <div class="grid2">
         <div class="stat"><span>Laba 20%</span><b id="autoProfit" class="blue num">Rp 0</b></div>
-        <div class="stat"><span>Total Pengeluaran</span><b id="spendingLimit" class="red num">Rp 0</b></div>
+        <div class="stat" onclick="showExpenseListModal()" style="cursor:pointer;border-color:#ffd7d0;background:#fff8f6"><span>Total Pengeluaran</span><b id="spendingLimit" class="red num">Rp 0</b><div style="font-size:9px;color:var(--red);font-weight:900;margin-top:3px">Tap untuk lihat detail</div></div>
       </div>
       <div id="operationalCard" class="card safe-card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;gap:8px"><b>Sisa Operasional</b><b id="operationalUsed" class="num">Rp 0</b></div><div class="small">Limit 20%: <span id="operationalTotal">Rp 0</span> · Terpakai: <span id="operationalSpent">Rp 0</span></div><div id="limitWarning" class="small red" style="font-weight:900;margin-top:5px"></div></div>
       <div class="card"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px"><div><div class="section-title" style="margin:0 0 3px">Zakat Mal</div><div id="zakatAmountLarge" class="num gold" style="font-size:23px">Rp 0</div><div id="zakatPaymentStatusText" class="small">Menunggu</div></div><button id="payZakatBtn" class="btn gold" style="width:auto;min-width:92px;padding:10px" onclick="markZakatPaid()">Bayar</button></div><div class="grid2" style="margin-top:10px"><div class="stat"><span>Total Laba</span><b id="totalProfitDisplay" class="num">Rp 0</b></div><div class="stat"><span>Belum Zakat</span><b id="unpaidProfitDisplay" class="num">Rp 0</b></div></div><div style="display:none"><span id="totalZakatPaidProfit">Rp 0</span></div><div id="zakatHistoryPreview" class="zakat-mini" style="display:none"><div id="zakatHistoryMiniList" class="zakat-mini"></div><button class="tab" onclick="showZakatHistoryModal()">Semua</button></div></div>
@@ -622,6 +623,18 @@ function escapeHtml(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'
 function openBackupModal(){if(!transactions.length){showToast('Data kosong');return}$('backupOptionModal').classList.remove('hidden')}function closeBackupModal(){$('backupOptionModal').classList.add('hidden')}function showImportModal(){closeBackupModal();$('importModal').classList.remove('hidden')}function closeImportModal(){$('importModal').classList.add('hidden');$('importDataText').value=''}function exportToFile(){const blob=new Blob([JSON.stringify(transactions,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`rocky_backup_${getLocalDateString()}.json`;a.click();URL.revokeObjectURL(url);closeBackupModal();showToast('Backup tersimpan')}function copyToClipboard(){navigator.clipboard.writeText(JSON.stringify(transactions)).then(()=>{closeBackupModal();showToast('Data disalin')}).catch(()=>showToast('Gagal salin'))}
 async function importFromText(){try{const raw=$('importDataText').value.trim();if(!raw){showToast('Data kosong');return}const imported=JSON.parse(raw);if(!Array.isArray(imported))throw new Error('format');const ok=imported.every(i=>i.id&&i.date&&i.description&&typeof i.amount==='number'&&(i.type==='income'||i.type==='expense'));if(!ok)throw new Error('format');await importTransactions(imported);await loadTransactions();render();closeImportModal();showToast('Import berhasil')}catch(e){showToast('Format JSON salah')}}
 function showToast(message,duration=2600){const old=document.querySelector('.toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=message;document.body.appendChild(t);setTimeout(()=>t.remove(),duration)}
+function showExpenseListModal(){
+  const expenses=getDashboardTransactions().filter(t=>t.type==='expense');
+  expenses.sort((a,b)=>b.date.localeCompare(a.date)||(b.id-a.id));
+  const total=expenses.reduce((s,t)=>s+Number(t.amount||0),0);
+  $('expenseListTotal').innerText=formatRupiah(total);
+  $('expenseListSubtitle').innerText=expenses.length+' transaksi pengeluaran (semua data)';
+  const c=$('expenseListContent');
+  if(!expenses.length){c.innerHTML='<div class="empty">Belum ada pengeluaran</div>';}
+  else{c.innerHTML=expenses.slice(0,100).map(t=>`<div class="item"><div class="left"><div class="icon out">-</div><div class="desc"><b>${escapeHtml(cleanFirebaseDesc(t.description))}${isFirebaseUploaded(t)?'<span class="lock-badge">FIREBASE LOCK</span>':''}</b><small>${t.date}</small></div></div><div class="right"><b class="num red">-${formatRupiah(t.amount).replace('Rp','')}</b></div></div>`).join('')+(expenses.length>100?`<div class="empty">Ditampilkan 100 dari ${expenses.length} data</div>`:'')}
+  $('expenseListModal').classList.remove('hidden');
+}
+function closeExpenseListModal(){$('expenseListModal').classList.add('hidden');}
 async function initApp(){try{if(!initSupabase())return;initFirebase();await loadTransactions();await loadZakatHistory();render();if(firebaseDb){startFirebaseWatch(firebaseUploadDate||getLocalDateString());startTodayFirebaseWatch();}showToast('Supabase tersambung')}catch(e){console.error(e);showToast('Gagal konek: '+e.message,6000)}}initApp();
 </script>
 </body>
