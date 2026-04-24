@@ -573,6 +573,7 @@
             50% { opacity: 1; }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -778,29 +779,78 @@
     </div>
 
     <script>
-        const DB_NAME = 'FinanceTrackerDB';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'transactions';
+        // ===== SUPABASE CONFIG =====
+        // 1) Isi dari Supabase Project Settings > API
+        const SUPABASE_URL = 'https://myxrvipyodadnldtomzs.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_aG-kyasJNCEk2U9fN5T4qg_GfY0FpPH';
+        const OWNER_ID = 'rocky-hijab'; // samakan di semua HP agar data tampil sama
         const APP_PASSWORD = '170845';
-        
-        let db;
+
+        let supabaseClient = null;
         let transactions = [];
+        let zakatHistory = [];
         let currentFilter = 'today';
         let pendingAction = null;
 
+        function isSupabaseConfigured() {
+            return SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes('ISI_') && !SUPABASE_ANON_KEY.includes('ISI_');
+        }
+
+        function initSupabase() {
+            if (!isSupabaseConfigured()) {
+                showToast('⚠️ Supabase belum disetting. Isi SUPABASE_URL dan SUPABASE_ANON_KEY dulu.', 5000);
+                return false;
+            }
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            return true;
+        }
+
         // ==== ZAKAT MANAGEMENT dengan Auto-Cancel ====
         function getZakatHistory() {
-            const stored = localStorage.getItem('zakatPaymentHistory');
-            if (!stored) return [];
-            try {
-                return JSON.parse(stored);
-            } catch(e) {
-                return [];
-            }
+            return zakatHistory || [];
         }
         
-        function saveZakatHistory(history) {
-            localStorage.setItem('zakatPaymentHistory', JSON.stringify(history));
+        async function loadZakatHistory() {
+            if (!supabaseClient) return [];
+            const { data, error } = await supabaseClient
+                .from('zakat_history')
+                .select('*')
+                .eq('owner_id', OWNER_ID)
+                .order('id', { ascending: true });
+            if (error) throw error;
+            zakatHistory = (data || []).map(r => ({
+                id: Number(r.id),
+                date: r.date,
+                profitAtPayment: Number(r.profit_at_payment || 0),
+                zakatPaid: Number(r.zakat_paid || 0),
+                cancelled: !!r.cancelled,
+                cancelledAt: r.cancelled_at,
+                note: r.note || ''
+            }));
+            return zakatHistory;
+        }
+        
+        async function saveZakatHistory(history) {
+            zakatHistory = history;
+            if (!supabaseClient) return;
+
+            // Simpel dan aman untuk app 1 user: hapus lalu tulis ulang riwayat zakat owner ini
+            const del = await supabaseClient.from('zakat_history').delete().eq('owner_id', OWNER_ID);
+            if (del.error) throw del.error;
+
+            if (!history.length) return;
+            const rows = history.map(record => ({
+                id: record.id,
+                owner_id: OWNER_ID,
+                date: record.date,
+                profit_at_payment: record.profitAtPayment,
+                zakat_paid: record.zakatPaid,
+                cancelled: !!record.cancelled,
+                cancelled_at: record.cancelledAt || null,
+                note: record.note || ''
+            }));
+            const ins = await supabaseClient.from('zakat_history').insert(rows);
+            if (ins.error) throw ins.error;
         }
         
         function getTotalProfit() {
@@ -838,7 +888,6 @@
             const totalProfit = getTotalProfit();
             let hasChanges = false;
             
-            let totalValidPaidProfit = 0;
             const updatedHistory = history.map(record => {
                 if (record.cancelled) return record;
                 
@@ -847,17 +896,16 @@
                     showToast(`⚠️ Zakat sebesar ${formatRupiah(record.zakatPaid)} dibatalkan karena transaksi yang menjadi dasar laba telah dihapus.`, 4000);
                     return { ...record, cancelled: true, cancelledAt: new Date().toISOString() };
                 }
-                totalValidPaidProfit += record.profitAtPayment;
                 return record;
             });
             
             if (hasChanges) {
-                saveZakatHistory(updatedHistory);
+                saveZakatHistory(updatedHistory).catch(err => showToast('Gagal update zakat: ' + err.message, 4000));
             }
             return hasChanges;
         }
         
-        function markZakatPaid() {
+        async function markZakatPaid() {
             const zakatDue = getCurrentZakatDue();
             if (zakatDue <= 0) {
                 showToast("✨ Tidak ada kewajiban zakat saat ini. Semua zakat sudah lunas.");
@@ -868,7 +916,7 @@
             const now = new Date();
             const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
             
-            if (confirm(`🕌 Bayar Zakat Mal\n\nBesaran Zakat: ${formatRupiah(zakatDue)}\nDari Laba: ${formatRupiah(unpaidProfit)}\n\n"Ambillah zakat dari harta mereka, guna membersihkan dan menyucikan mereka." (QS. At-Taubah: 103)\n\n⚠️ PENTING: Jika transaksi yang menghasilkan laba ini dihapus, zakat akan otomatis dibatalkan.\n\nLanjutkan pembayaran?`)) {
+            if (confirm(`🕌 Bayar Zakat Mal\n\nBesaran Zakat: ${formatRupiah(zakatDue)}\nDari Laba: ${formatRupiah(unpaidProfit)}\n\nLanjutkan pembayaran?`)) {
                 const history = getZakatHistory();
                 history.push({
                     id: Date.now(),
@@ -878,9 +926,13 @@
                     cancelled: false,
                     note: `Zakat dari laba Rp ${formatRupiah(unpaidProfit)}`
                 });
-                saveZakatHistory(history);
-                render();
-                showToast("✅ Alhamdulillah, zakat telah dibayar. Jika ada transaksi yang dibatalkan, zakat akan otomatis disesuaikan.");
+                try {
+                    await saveZakatHistory(history);
+                    render();
+                    showToast("✅ Alhamdulillah, zakat telah dibayar.");
+                } catch (err) {
+                    showToast('Gagal simpan zakat: ' + err.message, 5000);
+                }
             }
         }
         
@@ -914,78 +966,61 @@
             document.getElementById('zakatHistoryModal').classList.add('hidden');
         }
         
-        // ====== IndexedDB Functions ======
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => {
-                    db = request.result;
-                    resolve(db);
-                };
-                request.onupgradeneeded = (event) => {
-                    const db = event.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                    }
-                };
-            });
-        }
-
+        // ====== Supabase Functions ======
         async function loadTransactions() {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.getAll();
-                request.onsuccess = () => {
-                    transactions = request.result || [];
-                    transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-                    resolve(transactions);
-                };
-                request.onerror = () => reject(request.error);
-            });
+            const { data, error } = await supabaseClient
+                .from('transactions')
+                .select('*')
+                .eq('owner_id', OWNER_ID)
+                .order('date', { ascending: false })
+                .order('id', { ascending: false });
+            if (error) throw error;
+            transactions = (data || []).map(r => ({
+                id: Number(r.id),
+                date: r.date,
+                description: r.description,
+                amount: Number(r.amount || 0),
+                type: r.type
+            }));
+            return transactions;
         }
 
         async function saveTransaction(transactionData) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction([STORE_NAME], 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                const request = store.add(transactionData);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
+            const row = { ...transactionData, owner_id: OWNER_ID };
+            const { error } = await supabaseClient.from('transactions').insert(row);
+            if (error) throw error;
         }
 
         async function deleteTransactionFromDB(id) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction([STORE_NAME], 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                const request = store.delete(id);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
+            const { error } = await supabaseClient
+                .from('transactions')
+                .delete()
+                .eq('owner_id', OWNER_ID)
+                .eq('id', id);
+            if (error) throw error;
         }
 
         async function clearAllTransactions() {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction([STORE_NAME], 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                const request = store.clear();
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
+            const { error } = await supabaseClient
+                .from('transactions')
+                .delete()
+                .eq('owner_id', OWNER_ID);
+            if (error) throw error;
         }
 
         async function importTransactions(newTransactions) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction([STORE_NAME], 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                store.clear().onsuccess = () => {
-                    newTransactions.forEach(t => store.add(t));
-                };
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
+            await clearAllTransactions();
+            if (!newTransactions.length) return;
+            const rows = newTransactions.map(t => ({
+                id: t.id,
+                owner_id: OWNER_ID,
+                date: t.date,
+                description: t.description,
+                amount: t.amount,
+                type: t.type
+            }));
+            const { error } = await supabaseClient.from('transactions').insert(rows);
+            if (error) throw error;
         }
 
         function getLocalDateString() {
@@ -1074,7 +1109,7 @@
             openPasswordModal(async () => {
                 if(confirm("Hapus semua data? Ini akan membatalkan semua riwayat zakat.")) {
                     await clearAllTransactions();
-                    localStorage.removeItem('zakatPaymentHistory');
+                    await saveZakatHistory([]);
                     await loadTransactions();
                     render();
                     showToast("Semua data dihapus, riwayat zakat direset");
@@ -1436,10 +1471,16 @@
         }
 
         async function initApp() {
-            await initDB();
-            await loadTransactions();
-            render();
-            showToast("✨ Aplikasi siap digunakan | Kirim laporan via WhatsApp ✨");
+            try {
+                if (!initSupabase()) return;
+                await loadTransactions();
+                await loadZakatHistory();
+                render();
+                showToast("✨ Supabase tersambung | Data online siap digunakan ✨");
+            } catch (err) {
+                console.error(err);
+                showToast('Gagal konek Supabase: ' + err.message, 6000);
+            }
         }
         initApp();
     </script>
