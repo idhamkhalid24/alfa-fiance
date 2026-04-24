@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rocky Hijab Finance - Supabase Premium</title>
+    <title>Rocky Hijab Finance - Multi Page Ringan</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Rubik:wght@500;600;700;800;900&display=swap" rel="stylesheet">
@@ -46,7 +46,7 @@
             color: var(--text-dark);
             margin: 0;
             min-height: 100vh;
-            padding-bottom: 46px;
+            padding-bottom: 96px;
             line-height: 1.5;
         }
 
@@ -650,6 +650,89 @@
             .amount-input { font-size: 22px; }
         }
 
+
+
+        /* ===== MULTI PAGE LIGHT MODE: biar tidak banyak scroll ===== */
+        .page { display: none; animation: pageFade .18s ease; }
+        .page.active { display: block; }
+        @keyframes pageFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .page-title {
+            color: #f8df9b;
+            font-size: 18px;
+            font-weight: 950;
+            letter-spacing: -.4px;
+            margin: 2px 2px 14px;
+        }
+        .page-subtitle {
+            display:block;
+            color: rgba(255,255,255,.62);
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 12px 0 16px;
+        }
+        .quick-btn {
+            border-radius: 20px;
+            padding: 13px 12px;
+            background: rgba(255,255,255,.12);
+            color: #fff7dc;
+            border: 1px solid rgba(255,255,255,.16);
+            font-weight: 950;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+            backdrop-filter: blur(12px);
+        }
+        .quick-btn small { display:block; font-size:9px; color:rgba(255,255,255,.62); margin-top:2px; font-weight:700; }
+
+        .bottom-nav {
+            position: fixed;
+            left: 50%;
+            bottom: 14px;
+            transform: translateX(-50%);
+            width: min(calc(100% - 24px), 456px);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 8px;
+            border-radius: 26px;
+            background: rgba(8,32,24,.84);
+            border: 1px solid rgba(255,255,255,.14);
+            box-shadow: 0 18px 50px rgba(0,0,0,.38);
+            backdrop-filter: blur(18px);
+            z-index: 90;
+        }
+        .nav-btn {
+            border-radius: 18px;
+            padding: 10px 4px;
+            background: transparent;
+            color: rgba(255,255,255,.62);
+            font-size: 10px;
+            font-weight: 950;
+            letter-spacing: .2px;
+        }
+        .nav-btn span { display:block; font-size:17px; line-height:1; margin-bottom:4px; }
+        .nav-btn.active {
+            background: linear-gradient(135deg, var(--gold), #bb8225);
+            color: #102019;
+            box-shadow: 0 10px 24px rgba(231,191,99,.25);
+        }
+        .compact-card { margin-bottom: 12px; }
+        .history-list { max-height: 58vh; }
+        .grid-stats { margin-bottom: 12px; }
+        .zakat-card, .operational-card { margin-bottom: 12px; }
+        @media (max-height: 760px) {
+            .zakat-stats { margin: 8px 0; }
+            .zakat-amount-large { font-size: 22px; margin: 4px 0; }
+            .stat-item { padding: 10px; }
+            .card { padding: 15px; }
+            .history-list { max-height: 52vh; }
+        }
+
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -718,8 +801,11 @@
             </div>
         </header>
 
+        <main id="page-home" class="page active">
+            <h1 class="page-title">Dashboard<span class="page-subtitle">Ringkasan toko hari ini</span></h1>
+
         <!-- Card Operasional (Jatah Operasional 20%) -->
-        <section id="operationalCard" class="operational-card">
+        <section id="operationalCard" class="operational-card compact-card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:10px; font-weight:bold; opacity:0.8; text-transform:uppercase;">📊 Jatah Operasional (20%)</span>
                 <span id="spendingLimit" style="font-size:14px; font-weight:bold;">Rp 0</span>
@@ -800,6 +886,15 @@
             </div>
         </div>
 
+            <div class="quick-actions">
+                <button class="quick-btn" onclick="switchPage('transaksi')">➕ Input<small>Tambah transaksi</small></button>
+                <button class="quick-btn" onclick="switchPage('riwayat')">📜 Riwayat<small>Lihat laporan</small></button>
+            </div>
+        </main>
+
+        <main id="page-transaksi" class="page">
+            <h1 class="page-title">Transaksi<span class="page-subtitle">Input pemasukan / pengeluaran</span></h1>
+
         <!-- Form Input -->
         <section class="card">
             <div class="input-group">
@@ -818,6 +913,10 @@
 
             <button onclick="addTransaction()" class="btn-primary">+ Simpan Transaksi</button>
         </section>
+        </main>
+
+        <main id="page-riwayat" class="page">
+            <h1 class="page-title">Riwayat & Laporan<span class="page-subtitle">Filter data, backup, dan kirim WA</span></h1>
 
         <!-- Filter & List -->
         <section>
@@ -854,7 +953,14 @@
                 <div id="transactionList" class="history-list"></div>
             </div>
         </section>
+        </main>
     </div>
+
+    <nav class="bottom-nav">
+        <button id="nav-home" class="nav-btn active" onclick="switchPage('home')"><span>🏠</span>Home</button>
+        <button id="nav-transaksi" class="nav-btn" onclick="switchPage('transaksi')"><span>➕</span>Input</button>
+        <button id="nav-riwayat" class="nav-btn" onclick="switchPage('riwayat')"><span>📜</span>Riwayat</button>
+    </nav>
 
     <script>
         // ===== SUPABASE CONFIG =====
@@ -869,6 +975,18 @@
         let zakatHistory = [];
         let currentFilter = 'today';
         let pendingAction = null;
+        let currentPage = 'home';
+
+        function switchPage(page) {
+            currentPage = page;
+            ['home', 'transaksi', 'riwayat'].forEach(p => {
+                const pageEl = document.getElementById('page-' + p);
+                const navEl = document.getElementById('nav-' + p);
+                if (pageEl) pageEl.classList.toggle('active', p === page);
+                if (navEl) navEl.classList.toggle('active', p === page);
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
 
         function isSupabaseConfigured() {
             return SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes('ISI_') && !SUPABASE_ANON_KEY.includes('ISI_');
@@ -1380,19 +1498,13 @@
             else if (currentFilter === 'range') label.innerText = "Periode Kustom";
             else label.innerText = "Semua Riwayat";
 
-            if (filtered.length === 0) {
-                list.innerHTML = `
-                    <div style="padding:28px 16px; text-align:center; color:var(--text-soft);">
-                        <div style="font-size:32px; margin-bottom:8px;">☕</div>
-                        <b style="color:var(--text-dark);">Belum ada transaksi</b>
-                        <div style="font-size:11px; margin-top:4px;">Catatan untuk periode ini masih kosong.</div>
-                    </div>
-                `;
-            }
 
             let ti = 0, te = 0;
-            filtered.forEach(t => {
-                if (t.type === 'income') ti += t.amount; else te += t.amount;
+            filtered.forEach(t => { if (t.type === 'income') ti += t.amount; else te += t.amount; });
+
+            const displayLimit = 70;
+            const displayItems = filtered.slice(0, displayLimit);
+            displayItems.forEach(t => {
                 const div = document.createElement('div');
                 div.className = "item";
                 div.innerHTML = `
@@ -1414,6 +1526,20 @@
                 `;
                 list.appendChild(div);
             });
+
+            if (filtered.length === 0) {
+                list.innerHTML = `
+                    <div style="text-align:center; padding:34px 16px; color:var(--text-soft);">
+                        <div style="font-size:32px; margin-bottom:8px;">☕</div>
+                        <strong>Belum ada transaksi</strong><br>
+                        <span style="font-size:11px;">Coba tambah transaksi atau ganti filter.</span>
+                    </div>`;
+            } else if (filtered.length > displayLimit) {
+                const more = document.createElement('div');
+                more.style.cssText = 'text-align:center; padding:12px; font-size:10px; font-weight:800; color:var(--text-soft); background:rgba(255,255,255,.55);';
+                more.innerText = `Menampilkan ${displayLimit} transaksi terbaru dari ${filtered.length} data supaya aplikasi tetap ringan.`;
+                list.appendChild(more);
+            }
 
             const profitFiltered = ti * 0.2;
             const netFiltered = ti - te;
