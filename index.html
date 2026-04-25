@@ -61,7 +61,7 @@
     <div class="top"><div class="brand"><div><h1>Rocky Hijab</h1><small>Finance & Zakat</small></div><div id="statusBadge" class="pill"><span id="statusText">Aman</span></div></div></div>
 
     <section id="pageHome" class="page active">
-      <div class="hero"><div class="label">Saldo Bersih · Semua Data Supabase</div><div id="netBalance" class="value num">Rp 0</div><div class="mini"><span>Masuk <b id="totalIncome">Rp 0</b></span><span>Keluar <b id="totalExpense" onclick="showExpenseListModal()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">Rp 0</b></span></div></div>
+      <div class="hero"><div class="label">Saldo Bersih · Semua Data Supabase</div><div id="netBalance" class="value num">Rp 0</div><div class="mini"><span>Masuk <b id="totalIncome">Rp 0</b></span><span>Keluar Hari Ini <b id="totalExpense" onclick="showExpenseListTodayModal()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">Rp 0</b></span></div></div>
       <div id="todayIncomeCard" class="card" style="margin-bottom:10px;background:#f3fbf6;border-color:#ccefd9">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div>
@@ -74,7 +74,7 @@
       </div>
       <div class="grid2">
         <div class="stat"><span>Laba 20%</span><b id="autoProfit" class="blue num">Rp 0</b></div>
-        <div class="stat" onclick="showExpenseListModal()" style="cursor:pointer;border-color:#ffd7d0;background:#fff8f6"><span>Total Pengeluaran</span><b id="spendingLimit" class="red num">Rp 0</b><div style="font-size:9px;color:var(--red);font-weight:900;margin-top:3px">Tap untuk lihat detail</div></div>
+        <div class="stat" onclick="showExpenseListTodayModal()" style="cursor:pointer;border-color:#ffd7d0;background:#fff8f6"><span>Pengeluaran Hari Ini</span><b id="spendingLimit" class="red num">Rp 0</b><div style="font-size:9px;color:var(--red);font-weight:900;margin-top:3px">Tap untuk lihat detail</div></div>
       </div>
       <div id="operationalCard" class="card safe-card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;gap:8px"><b>Sisa Operasional</b><b id="operationalUsed" class="num">Rp 0</b></div><div class="small">Limit 20%: <span id="operationalTotal">Rp 0</span> · Terpakai: <span id="operationalSpent">Rp 0</span></div><div id="limitWarning" class="small red" style="font-weight:900;margin-top:5px"></div></div>
       <div class="card"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px"><div><div class="section-title" style="margin:0 0 3px">Zakat Mal</div><div id="zakatAmountLarge" class="num gold" style="font-size:23px">Rp 0</div><div id="zakatPaymentStatusText" class="small">Menunggu</div></div><button id="payZakatBtn" class="btn gold" style="width:auto;min-width:92px;padding:10px" onclick="markZakatPaid()">Bayar</button></div><div class="grid2" style="margin-top:10px"><div class="stat"><span>Total Laba</span><b id="totalProfitDisplay" class="num">Rp 0</b></div><div class="stat"><span>Belum Zakat</span><b id="unpaidProfitDisplay" class="num">Rp 0</b></div></div><div style="display:none"><span id="totalZakatPaidProfit">Rp 0</span></div><div id="zakatHistoryPreview" class="zakat-mini" style="display:none"><div id="zakatHistoryMiniList" class="zakat-mini"></div><button class="tab" onclick="showZakatHistoryModal()">Semua</button></div></div>
@@ -96,6 +96,10 @@
       </div>
       <div class="tabs"><button onclick="changeFilter('today')" id="filter-today" class="tab active">Hari Ini</button><button onclick="changeFilter('month')" id="filter-month" class="tab">Bulan Ini</button><button onclick="changeFilter('range')" id="filter-range" class="tab">Custom</button><button onclick="changeFilter('all')" id="filter-all" class="tab">Semua</button></div>
       <div id="rangeSelectorHistory" class="card hidden" style="margin-bottom:10px"><div class="row"><input type="date" id="filterStartDateHistory" onchange="onHistoryRangeChange()"><input type="date" id="filterEndDateHistory" onchange="onHistoryRangeChange()"></div></div>
+      <div class="grid2" style="margin-bottom:10px">
+        <div class="stat" onclick="showExpenseListModalFiltered()" style="cursor:pointer;border-color:#ffd7d0;background:#fff8f6"><span id="expenseFilteredLabel">Pengeluaran Hari Ini</span><b id="expenseFilteredSummary" class="red num">Rp 0</b><div style="font-size:9px;color:var(--red);font-weight:900;margin-top:3px">Tap untuk lihat detail</div></div>
+        <div class="stat" onclick="showExpenseListModal()" style="cursor:pointer;border-color:#ffd7d0;background:#fff8f6"><span>Total Semua Pengeluaran</span><b id="expenseAllSummary" class="red num">Rp 0</b><div style="font-size:9px;color:var(--red);font-weight:900;margin-top:3px">Tap untuk lihat semua</div></div>
+      </div>
       <div class="compact-actions" style="margin-bottom:10px"><button class="btn whatsapp" onclick="sendWhatsAppReport()">Kirim WA</button><button class="btn secondary" onclick="openBackupModal()">Backup</button></div>
       <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b id="currentPeriodLabel">Riwayat</b><button class="tab" style="color:var(--red)" onclick="requestClearAll()">Reset</button></div><div id="transactionList" class="list"></div></div>
     </section>
@@ -601,22 +605,44 @@ function render(){
   // Ringkasan dashboard utama: semua data yang sudah masuk Supabase.
   // Ini yang membuat Saldo Bersih langsung berubah setelah upload omset Firebase.
   const dashboardRows=getDashboardTransactions();
-  let totalIn=0,totalOut=0;
+  const today=getLocalDateString(), thisMonth=today.slice(0,7);
+  let totalIn=0,totalOut=0,todayOut=0,monthOut=0;
   dashboardRows.forEach(t=>{
     if(t.type==='income')totalIn+=Number(t.amount||0);
-    else totalOut+=Number(t.amount||0);
+    else{
+      totalOut+=Number(t.amount||0);
+      if(t.date===today)todayOut+=Number(t.amount||0);
+      if(String(t.date||'').startsWith(thisMonth))monthOut+=Number(t.amount||0);
+    }
   });
   const profit=totalIn*.2;
   const net=totalIn-totalOut;
   $('totalIncome').innerText=formatRupiah(totalIn);
-  $('totalExpense').innerText=formatRupiah(totalOut);
+  $('totalExpense').innerText=formatRupiah(todayOut);   // hero: hari ini
   $('autoProfit').innerText=formatRupiah(profit);
   $('netBalance').innerText=formatRupiah(net);
   const remainingOps=profit-totalOut;
-  $('spendingLimit').innerText=formatRupiah(totalOut);
+  $('spendingLimit').innerText=formatRupiah(todayOut);  // stat card home: hari ini
   $('operationalUsed').innerText=formatRupiah(remainingOps);
   $('operationalTotal').innerText=formatRupiah(profit);
   const spentEl=$('operationalSpent');if(spentEl)spentEl.innerText=formatRupiah(totalOut);
+  // Riwayat: pengeluaran sesuai filter aktif + semua
+  if($('expenseAllSummary'))$('expenseAllSummary').innerText=formatRupiah(totalOut);
+  // Stat card kiri ikut filter aktif
+  const s2=$('filterStartDate')?$('filterStartDate').value:'', e2=$('filterEndDate')?$('filterEndDate').value:'';
+  let filteredOut=0, filteredLabel='Pengeluaran Hari Ini';
+  if(currentFilter==='today'){
+    filteredOut=todayOut; filteredLabel='Pengeluaran Hari Ini';
+  } else if(currentFilter==='month'){
+    filteredOut=monthOut; filteredLabel='Pengeluaran Bulan Ini';
+  } else if(currentFilter==='range'){
+    filteredOut=dashboardRows.filter(t=>t.type==='expense'&&t.date>=s2&&t.date<=e2).reduce((a,t)=>a+Number(t.amount||0),0);
+    filteredLabel=s2&&e2?`Pengeluaran ${s2.slice(5)} s.d ${e2.slice(5)}`:'Pengeluaran Custom';
+  } else {
+    filteredOut=totalOut; filteredLabel='Total Semua Pengeluaran';
+  }
+  if($('expenseFilteredSummary'))$('expenseFilteredSummary').innerText=formatRupiah(filteredOut);
+  if($('expenseFilteredLabel'))$('expenseFilteredLabel').innerText=filteredLabel;
 
   validateAndCancelInvalidZakat();
   const totalProfit=getTotalProfit(),paid=getTotalProfitZakatPaid(),unpaid=getUnpaidProfit(),due=getCurrentZakatDue();
@@ -669,6 +695,44 @@ async function importFromText(){try{const raw=$('importDataText').value.trim();i
   if(importedZakat.length){await saveZakatHistory(importedZakat);}
   await loadTransactions();await loadZakatHistory();render();closeImportModal();showToast('Import berhasil'+(importedZakat.length?` (${importedZakat.length} zakat restore)`:''))}catch(e){showToast('Format JSON salah')}}
 function showToast(message,duration=2600){const old=document.querySelector('.toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=message;document.body.appendChild(t);setTimeout(()=>t.remove(),duration)}
+function showExpenseListTodayModal(){
+  const today=getLocalDateString();
+  const expenses=getDashboardTransactions().filter(t=>t.type==='expense'&&t.date===today);
+  expenses.sort((a,b)=>b.id-a.id);
+  const total=expenses.reduce((sum,t)=>sum+Number(t.amount||0),0);
+  $('expenseListTotal').innerText=formatRupiah(total);
+  $('expenseListSubtitle').innerText=`${expenses.length} transaksi · Pengeluaran hari ini (${today})`;
+  const c=$('expenseListContent');
+  if(!expenses.length){c.innerHTML='<div class="empty">Belum ada pengeluaran hari ini</div>';}
+  else{c.innerHTML=expenses.slice(0,100).map(t=>`<div class="item"><div class="left"><div class="icon out">-</div><div class="desc"><b>${escapeHtml(cleanFirebaseDesc(t.description))}</b><small>${t.date}</small></div></div><div class="right"><b class="num red">-${formatRupiah(t.amount).replace('Rp','')}</b></div></div>`).join('')}
+  $('expenseListModal').classList.remove('hidden');
+}
+function showExpenseListModalFiltered(){
+  const today=getLocalDateString(), thisMonth=today.slice(0,7);
+  const s=$('filterStartDate')?$('filterStartDate').value:'', e=$('filterEndDate')?$('filterEndDate').value:'';
+  let expenses=getDashboardTransactions().filter(t=>t.type==='expense');
+  let subtitle='';
+  if(currentFilter==='today'){
+    expenses=expenses.filter(t=>t.date===today);
+    subtitle='Pengeluaran hari ini';
+  } else if(currentFilter==='month'){
+    expenses=expenses.filter(t=>String(t.date||'').startsWith(thisMonth));
+    subtitle='Pengeluaran bulan ini';
+  } else if(currentFilter==='range'){
+    expenses=expenses.filter(t=>t.date>=s&&t.date<=e);
+    subtitle=s&&e?`Pengeluaran ${s} s.d ${e}`:'Pengeluaran custom';
+  } else {
+    subtitle='Semua pengeluaran';
+  }
+  expenses.sort((a,b)=>b.date.localeCompare(a.date)||(b.id-a.id));
+  const total=expenses.reduce((sum,t)=>sum+Number(t.amount||0),0);
+  $('expenseListTotal').innerText=formatRupiah(total);
+  $('expenseListSubtitle').innerText=`${expenses.length} transaksi · ${subtitle}`;
+  const c=$('expenseListContent');
+  if(!expenses.length){c.innerHTML='<div class="empty">Belum ada pengeluaran</div>';}
+  else{c.innerHTML=expenses.slice(0,100).map(t=>`<div class="item"><div class="left"><div class="icon out">-</div><div class="desc"><b>${escapeHtml(cleanFirebaseDesc(t.description))}${isFirebaseUploaded(t)?'<span class="lock-badge">FIREBASE LOCK</span>':''}</b><small>${t.date}</small></div></div><div class="right"><b class="num red">-${formatRupiah(t.amount).replace('Rp','')}</b></div></div>`).join('')+(expenses.length>100?`<div class="empty">Ditampilkan 100 dari ${expenses.length} data</div>`:'')}
+  $('expenseListModal').classList.remove('hidden');
+}
 function showExpenseListModal(){
   const expenses=getDashboardTransactions().filter(t=>t.type==='expense');
   expenses.sort((a,b)=>b.date.localeCompare(a.date)||(b.id-a.id));
