@@ -155,47 +155,42 @@
     <section id="pageHome" class="page active">
       <div class="hero"><div class="label">Saldo Bersih · Semua Data Supabase</div><div id="netBalance" class="value num">Rp 0</div><div class="mini"><span>Masuk <b id="totalIncome">Rp 0</b></span><span>Keluar Hari Ini <b id="totalExpense" onclick="showExpenseListTodayModal()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">Rp 0</b></span></div></div>
 
-      <!-- Pendapatan Hari Ini -->
-      <div id="todayIncomeCard" class="card" style="margin-bottom:10px;background:#f3fbf6;border-color:#ccefd9">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-          <div style="min-width:0;flex:1">
-            <div id="todayIncomeSectionTitle" class="section-title" style="margin:0 0 4px;color:var(--green)">Pendapatan Hari Ini</div>
-            <div id="todayFirebaseIncomeHome" class="num green" style="font-size:24px">Rp 0</div>
-            <div id="todayFirebaseIncomeInfo" class="small">Firebase + Manual - Operasional Toko</div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
-            <span class="lock-badge" style="margin-left:0;background:#eef2e8;color:var(--green)">HARI INI</span>
-            <button onclick="openOpsModal()" style="font-size:10px;padding:5px 9px;border-radius:999px;background:#fff3e0;color:#e8820c;font-weight:900;border:1px solid #ffd7a0;cursor:pointer;white-space:nowrap">+ Ops Toko</button>
-          </div>
-        </div>
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #ccefd9;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:10px;color:var(--muted);font-weight:800">Operasional Toko Hari Ini</span>
-          <b id="opsTodayHomeTotal" class="num" style="font-size:13px;color:#e8820c;cursor:pointer" onclick="openOpsModal()">Rp 0</b>
-        </div>
-      </div>
-
-      <!-- Cash Fisik Card — sama persis style card Pendapatan Hari Ini -->
+      <!-- Cash Fisik Card Gabungan (Ops Toko + QRIS + Tabungan) -->
       <div class="card" style="margin-bottom:10px;background:#eff6ff;border-color:#bfdbfe">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div style="min-width:0;flex:1">
             <div class="section-title" style="margin:0 0 4px;color:#2563eb">Cash Fisik Hari Ini</div>
-            <div id="cashFisikTotal" class="num" style="font-size:24px;color:#2563eb;cursor:pointer" onclick="openCashOutModal()">Rp 0</div>
-            <div class="small" style="color:#4b5563">Pendapatan Cash setelah dikurangi QRIS & Tabungan</div>
+            <div id="cashFisikTotal" class="num" style="font-size:26px;color:#2563eb;cursor:pointer" onclick="openCashOutModal()">Rp 0</div>
+            <div id="todayFirebaseIncomeInfo" class="small" style="color:#4b5563;margin-top:2px">Pendapatan - Ops Toko - QRIS - Tabungan</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
             <span class="lock-badge" style="margin-left:0;background:#dbeafe;color:#1d4ed8">HARI INI</span>
-            <button onclick="openCashOutModal()" style="font-size:10px;padding:5px 9px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;border:1px solid #93c5fd;cursor:pointer;white-space:nowrap">+ QRIS/Tabungan</button>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+              <button onclick="openOpsModal()" style="font-size:10px;padding:5px 9px;border-radius:999px;background:#fff3e0;color:#e8820c;font-weight:900;border:1px solid #ffd7a0;cursor:pointer;white-space:nowrap">+ Ops</button>
+              <button onclick="openCashOutModal()" style="font-size:10px;padding:5px 9px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:900;border:1px solid #93c5fd;cursor:pointer;white-space:nowrap">+ QRIS</button>
+            </div>
           </div>
         </div>
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #bfdbfe;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:10px;color:var(--muted);font-weight:800">QRIS Hari Ini</span>
-          <b id="cashOutQrisTotal" class="num" style="font-size:13px;color:#2563eb;cursor:pointer" onclick="openCashOutModal()">Rp 0</b>
-        </div>
-        <div style="margin-top:5px;padding-top:5px;border-top:1px solid #bfdbfe;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:10px;color:var(--muted);font-weight:800">Tabungan Hari Ini</span>
-          <b id="cashOutTabunganTotal" class="num" style="font-size:13px;color:#854d0e;cursor:pointer" onclick="openCashOutModal()">Rp 0</b>
+        <!-- Baris breakdown -->
+        <div style="margin-top:9px;padding-top:9px;border-top:1px solid #bfdbfe;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:10px;color:var(--muted);font-weight:800">Operasional Toko</span>
+            <b id="opsTodayHomeTotal" class="num" style="font-size:13px;color:#e8820c;cursor:pointer" onclick="openOpsModal()">Rp 0</b>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:10px;color:var(--muted);font-weight:800">QRIS</span>
+            <b id="cashOutQrisTotal" class="num" style="font-size:13px;color:#2563eb;cursor:pointer" onclick="openCashOutModal()">Rp 0</b>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:10px;color:var(--muted);font-weight:800">Tabungan</span>
+            <b id="cashOutTabunganTotal" class="num" style="font-size:13px;color:#854d0e;cursor:pointer" onclick="openCashOutModal()">Rp 0</b>
+          </div>
         </div>
       </div>
+      <!-- Hidden elements tetap ada agar JS tidak error -->
+      <div id="todayIncomeCard" class="hidden"></div>
+      <div id="todayFirebaseIncomeHome" class="hidden"></div>
+      <div id="todayIncomeSectionTitle" class="hidden"></div>
 
       <!-- Ringkasan Laba dengan Filter -->
       <div class="profit-summary-card">
@@ -495,7 +490,9 @@ function getFirebaseUploadId(date){return Number(String(date||'').replace(/\D/g,
 function getUploadedFirebaseTransaction(date){const id=getFirebaseUploadId(date);return transactions.find(t=>Number(t.id)===id || String(t.description||'').startsWith(`[FIREBASE:${date}]`))}
 function initFirebase(){try{if(!window.firebase)return false;if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);firebaseDb=firebase.firestore();return true}catch(e){console.error(e);showToast('Firebase gagal aktif: '+e.message);return false}}
 function renderTodayFirebaseIncomeHome(){
-  // Pendapatan Hari Ini = omset Firebase hari ini + pemasukan manual - pengeluaran operasional toko hari ini.
+  // Card Pendapatan Hari Ini sudah digabung ke Cash Fisik — panggil renderCashFisik saja
+  renderCashFisik(); return;
+  // (kode lama di bawah tidak dipakai lagi)
   const totalEl=$('todayFirebaseIncomeHome'),infoEl=$('todayFirebaseIncomeInfo');
   const today=getLocalDateString();
   const manualRows=(transactions||[]).filter(t=>t.type==='income' && t.date===today && !isFirebaseUploaded(t));
@@ -1039,9 +1036,22 @@ function renderCashFisik(){
   const pendapatanHariIni=manualIncome+fbTotal-opsTotal;
   const co=getTodayCashOutTotals();
   const cashFisik=pendapatanHariIni-co.total;
-  // Update home card
+  // Update home card gabungan
   const cfEl=$('cashFisikTotal');
   if(cfEl){cfEl.innerText=formatRupiah(cashFisik<0?0:cashFisik);cfEl.style.color=cashFisik<0?'var(--red)':'#2563eb';}
+  // Update info text dengan breakdown sumber pendapatan
+  const infoEl=$('todayFirebaseIncomeInfo');
+  if(infoEl){
+    const parts=[];
+    if(fbTotal>0)parts.push(`Firebase ${formatRupiah(fbTotal)}`);
+    if(manualIncome>0)parts.push(`Manual ${formatRupiah(manualIncome)}`);
+    if(opsTotal>0)parts.push(`Ops -${formatRupiah(opsTotal)}`);
+    if(co.qris>0)parts.push(`QRIS -${formatRupiah(co.qris)}`);
+    if(co.tabungan>0)parts.push(`Tabungan -${formatRupiah(co.tabungan)}`);
+    infoEl.innerText=parts.length?parts.join(' · '):'Pendapatan - Ops Toko - QRIS - Tabungan';
+  }
+  // Update ops total di breakdown
+  const opsTodayHomeEl=$('opsTodayHomeTotal');if(opsTodayHomeEl)opsTodayHomeEl.innerText=formatRupiah(opsTotal);
   const qEl=$('cashOutQrisTotal');if(qEl)qEl.innerText=formatRupiah(co.qris);
   const tEl=$('cashOutTabunganTotal');if(tEl)tEl.innerText=formatRupiah(co.tabungan);
   // Update modal ringkasan
