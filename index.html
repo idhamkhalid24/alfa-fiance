@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Rocky Hijab Finance v23 Sync Firebase</title>
+  <title>alfajri Finance v23 Sync Firebase</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
@@ -150,7 +150,7 @@
   <div id="expenseListModal" class="modal hidden"><div class="box" style="max-width:420px;width:100%"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px"><div><h3 style="margin:0;font-size:16px">Semua Pengeluaran</h3><small id="expenseListSubtitle" style="color:var(--muted);font-size:11px;font-weight:800"></small></div><button class="x" style="font-size:22px;padding:4px 6px" onclick="closeExpenseListModal()">×</button></div><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fff0ee;border-radius:13px;margin-bottom:12px"><span style="font-size:12px;font-weight:900;color:var(--red)">Total Pengeluaran</span><b id="expenseListTotal" class="num red" style="font-size:16px">Rp 0</b></div><div id="expenseListContent" class="list" style="max-height:55vh;overflow-y:auto"></div><button class="btn secondary" onclick="closeExpenseListModal()" style="margin-top:12px">Tutup</button></div></div>
 
   <main class="app">
-    <div class="top"><div class="brand"><div><h1>Rocky Hijab</h1><small>Finance & Zakat</small></div><div id="statusBadge" class="pill"><span id="statusText">Aman</span></div></div></div>
+    <div class="top"><div class="brand"><div><h1>alfajri</h1><small>Finance & Zakat</small></div><div id="statusBadge" class="pill"><span id="statusText">Aman</span></div></div></div>
 
     <section id="pageHome" class="page active">
       <div class="hero"><div class="label">Saldo Bersih · Semua Data Supabase</div><div id="netBalance" class="value num">Rp 0</div><div class="mini"><span>Masuk <b id="totalIncome">Rp 0</b></span><span>Keluar Hari Ini <b id="totalExpense" onclick="showExpenseListTodayModal()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">Rp 0</b></span></div></div>
@@ -486,7 +486,7 @@ function getFilteredTransactions(){
   return transactions.filter(t=>currentFilter==='month'?t.date.startsWith(now.substring(0,7)):currentFilter==='range'?t.date>=s&&t.date<=e:true)
 }
 function getPeriodLabel(){const now=getLocalDateString();if(currentFilter==='today')return `Hari Ini (${now})`;if(currentFilter==='month')return `Bulan Ini`;if(currentFilter==='range')return `${$('filterStartDate').value} s.d ${$('filterEndDate').value}`;return 'Semua Riwayat'}
-function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else{te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});const labaTotal=getTotalProfit();const zakatDue=getCurrentZakatDue();let r=`📊 *LAPORAN ROCKY HIJAB*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20% (Manual+Firebase): ${formatRupiah(labaTotal)}\n🕌 Zakat wajib (2.5% laba): ${formatRupiah(zakatDue)}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari Rocky Hijab Finance_'}
+function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else{te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});const labaTotal=getTotalProfit();const zakatDue=getCurrentZakatDue();let r=`📊 *LAPORAN alfajri*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20% (Manual+Firebase): ${formatRupiah(labaTotal)}\n🕌 Zakat wajib (2.5% laba): ${formatRupiah(zakatDue)}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari alfajri Finance_'}
 function sendWhatsAppReport(){if(!getFilteredTransactions().length){showToast('Tidak ada transaksi');return}const no=prompt('Nomor WhatsApp tujuan. Kosongkan untuk copy laporan.','');const report=generateWhatsAppReport();if(no&&no.trim()){let n=no.replace(/[^0-9]/g,'');if(n.startsWith('0'))n='62'+n.slice(1);if(!n.startsWith('62'))n='62'+n;window.open(`https://wa.me/${n}?text=${encodeURIComponent(report)}`,'_blank');showToast('Membuka WhatsApp')}else{navigator.clipboard.writeText(report).then(()=>showToast('Laporan disalin')).catch(()=>showToast('Gagal salin'))}}
 
 function isFirebaseUploaded(t){return !!(t&&t.__firebasePreview) || String(t?.description||'').startsWith('[FIREBASE:')}
@@ -1214,7 +1214,7 @@ function downloadXlsMonth(){
 
   // ── SHEET 1: RINGKASAN ──
   const summaryData=[
-    ['REKAP KEUANGAN ROCKY HIJAB'],
+    ['REKAP KEUANGAN alfajri'],
     [`Bulan: ${monthLabel}`],
     [`Dicetak: ${today}`],
     [],
