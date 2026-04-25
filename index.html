@@ -415,7 +415,7 @@ function getGrossIncomeForRange(mode,startDate,endDate){
       .filter(t=>t.type==='income' && t.date===today && !isFirebaseUploaded(t))
       .reduce((sum,t)=>sum+Number(t.amount||0),0);
     const manualExpense=(transactions||[])
-      .filter(t=>t.type==='expense' && t.date===today)
+      .filter(t=>t.type==='expense' && !isCashOut(t) && t.date===today)
       .reduce((sum,t)=>sum+Number(t.amount||0),0);
     return manualIncome + Number(todayFirebaseIncomeTotal||0) - manualExpense;
   }
@@ -426,7 +426,7 @@ function getGrossIncomeForRange(mode,startDate,endDate){
     return true; // all
   });
   const expenseRows=transactions.filter(t=>{
-    if(t.type!=='expense')return false;
+    if(t.type!=='expense'||isCashOut(t))return false;
     if(mode==='month')return String(t.date||'').startsWith(month);
     if(mode==='range')return t.date>=(startDate||'') && t.date<=(endDate||'');
     return true; // all
@@ -481,7 +481,7 @@ function getFilteredTransactions(){
   return transactions.filter(t=>currentFilter==='month'?t.date.startsWith(now.substring(0,7)):currentFilter==='range'?t.date>=s&&t.date<=e:true)
 }
 function getPeriodLabel(){const now=getLocalDateString();if(currentFilter==='today')return `Hari Ini (${now})`;if(currentFilter==='month')return `Bulan Ini`;if(currentFilter==='range')return `${$('filterStartDate').value} s.d ${$('filterEndDate').value}`;return 'Semua Riwayat'}
-function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else{te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});const labaTotal=getTotalProfit();const zakatDue=getCurrentZakatDue();let r=`📊 *LAPORAN alfajri*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20% (Manual+Firebase): ${formatRupiah(labaTotal)}\n🕌 Zakat wajib (2.5% laba): ${formatRupiah(zakatDue)}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari alfajri Finance_'}
+function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else if(!isCashOut(t)){te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});const labaTotal=getTotalProfit();const zakatDue=getCurrentZakatDue();let r=`📊 *LAPORAN alfajri*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20% (Manual+Firebase): ${formatRupiah(labaTotal)}\n🕌 Zakat wajib (2.5% laba): ${formatRupiah(zakatDue)}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari alfajri Finance_'}
 function sendWhatsAppReport(){if(!getFilteredTransactions().length){showToast('Tidak ada transaksi');return}const no=prompt('Nomor WhatsApp tujuan. Kosongkan untuk copy laporan.','');const report=generateWhatsAppReport();if(no&&no.trim()){let n=no.replace(/[^0-9]/g,'');if(n.startsWith('0'))n='62'+n.slice(1);if(!n.startsWith('62'))n='62'+n;window.open(`https://wa.me/${n}?text=${encodeURIComponent(report)}`,'_blank');showToast('Membuka WhatsApp')}else{navigator.clipboard.writeText(report).then(()=>showToast('Laporan disalin')).catch(()=>showToast('Gagal salin'))}}
 
 function isFirebaseUploaded(t){return !!(t&&t.__firebasePreview) || String(t?.description||'').startsWith('[FIREBASE:')}
@@ -873,13 +873,30 @@ function render(){
   // List Riwayat tetap mengikuti filter yang sedang dipilih.
   const f=getFilteredTransactions();
   const periodIncome=f.reduce((sum,t)=>t.type==='income'?sum+Number(t.amount||0):sum,0);
-  const periodExpense=f.reduce((sum,t)=>t.type==='expense'?sum+Number(t.amount||0):sum,0);
-  const periodNet=periodIncome-periodExpense;
-  $('currentPeriodLabel').innerText=`${getPeriodLabel()} · ${formatRupiah(periodNet)}`;
+  // cashout (QRIS/Tabungan) tidak dihitung sebagai pengeluaran di summary
   const list=$('transactionList');
   if(!list){renderFirebaseUploadCard();return}
   if(!f.length){list.innerHTML='<div class="empty">Belum ada transaksi</div>';renderFirebaseUploadCard();return}
-  list.innerHTML=f.slice(0,80).map(t=>`<div class="item"><div class="left"><div class="icon ${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'-'}</div><div class="desc"><b>${escapeHtml(cleanFirebaseDesc(t.description))}${isFirebaseUploaded(t)?'<span class="lock-badge">FIREBASE LOCK</span>':''}</b><small>${t.date}</small></div></div><div class="right"><b class="num ${t.type==='income'?'green':'red'}">${t.type==='income'?'+':'-'}${formatRupiah(t.amount).replace('Rp','')}</b>${isFirebaseUploaded(t)?`<div class="small blue" style="font-weight:900">${t.__firebasePreview?'PREVIEW':'LOCK'}</div>`:`<button class="x" onclick="deleteTransaction(${t.id})">×</button>`}</div></div>`).join('')+(f.length>80?`<div class="empty">Ditampilkan 80 dari ${f.length} data biar ringan</div>`:'');
+  const periodExpenseReal=f.filter(t=>t.type==='expense'&&!isCashOut(t)).reduce((sum,t)=>sum+Number(t.amount||0),0);
+  $('currentPeriodLabel').innerText=`${getPeriodLabel()} · ${formatRupiah(periodIncome-periodExpenseReal)}`;
+  list.innerHTML=f.slice(0,80).map(t=>{
+    const co=isCashOut(t);
+    const tp=co?getCashOutType(t):'';
+    const coLabel={qris:'QRIS',tabungan:'Tabungan',lainnya:'Lainnya'}[tp]||'';
+    const icon=co?'💳':(t.type==='income'?'+':'-');
+    const iconClass=co?'in':(t.type==='income'?'in':'out');
+    const iconStyle=co?'background:#e0f2fe;color:#0369a1':'';
+    const desc=co?cleanCashOutDesc(t.description)||coLabel:cleanFirebaseDesc(t.description);
+    const amtColor=co?'#0369a1':(t.type==='income'?'var(--green)':'var(--red)');
+    const amtPrefix=co?'':'';
+    const amtSign=t.type==='income'?'+':'-';
+    const badge=co?`<span class="cashout-badge ${tp}" style="font-size:9px;margin-left:4px">${coLabel}</span>`:
+      (isFirebaseUploaded(t)?'<span class="lock-badge">FIREBASE LOCK</span>':'');
+    const ctrl=co
+      ? `<div class="small" style="color:#0369a1;font-weight:900;font-size:9px">CASH PINDAH</div>`
+      : (isFirebaseUploaded(t)?`<div class="small blue" style="font-weight:900">${t.__firebasePreview?'PREVIEW':'LOCK'}</div>`:`<button class="x" onclick="deleteTransaction(${t.id})">×</button>`);
+    return `<div class="item" style="${co?'background:#f0f9ff;border-color:#bfdbfe':''}"><div class="left"><div class="icon ${iconClass}" style="${iconStyle}">${icon}</div><div class="desc"><b>${escapeHtml(desc)}${badge}</b><small>${t.date}</small></div></div><div class="right"><b class="num" style="color:${amtColor}">${amtSign}${formatRupiah(t.amount).replace('Rp','')}</b>${ctrl}</div></div>`;
+  }).join('')+(f.length>80?`<div class="empty">Ditampilkan 80 dari ${f.length} data biar ringan</div>`:'');
   renderFirebaseUploadCard();
 }
 function escapeHtml(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
@@ -996,11 +1013,19 @@ function renderCashOutTodayList(){
 
 
 function deleteCashOutWithPin(id){
-  openPasswordModal(async()=>{
-    await deleteTransaction(id);
-    setTimeout(()=>{renderCashOutTodayList();renderCashFisik();render();},400);
-    showToast('QRIS/Tabungan dihapus');
-  });
+  closeCashOutModal();
+  setTimeout(()=>{
+    openPasswordModal(async()=>{
+      try{
+        await deleteTransactionFromDB(id);
+        await loadTransactions();
+        render();
+        renderCashFisik();
+        showToast('QRIS/Tabungan dihapus');
+      }catch(e){showToast('Gagal hapus: '+e.message)}
+      setTimeout(()=>{openCashOutModal();},200);
+    });
+  },200);
 }
 async function addCashOut(){
   const type=currentCashOutType||'qris';
@@ -1133,7 +1158,7 @@ function renderProfitSummary(){
 }
 function showExpenseListTodayModal(){
   const today=getLocalDateString();
-  const expenses=getDashboardTransactions().filter(t=>t.type==='expense'&&t.date===today);
+  const expenses=getDashboardTransactions().filter(t=>t.type==='expense'&&!isCashOut(t)&&t.date===today);
   expenses.sort((a,b)=>b.id-a.id);
   const total=expenses.reduce((sum,t)=>sum+Number(t.amount||0),0);
   $('expenseListTotal').innerText=formatRupiah(total);
@@ -1146,7 +1171,7 @@ function showExpenseListTodayModal(){
 function showExpenseListModalFiltered(){
   const today=getLocalDateString(), thisMonth=today.slice(0,7);
   const s=$('filterStartDate')?$('filterStartDate').value:'', e=$('filterEndDate')?$('filterEndDate').value:'';
-  let expenses=getDashboardTransactions().filter(t=>t.type==='expense');
+  let expenses=getDashboardTransactions().filter(t=>t.type==='expense'&&!isCashOut(t));
   let subtitle='';
   if(currentFilter==='today'){
     expenses=expenses.filter(t=>t.date===today);
