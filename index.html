@@ -366,28 +366,20 @@ async function markZakatPaid(){const due=getCurrentZakatDue();if(due<=0){showToa
 function showZakatHistoryModal(){const h=getZakatHistory(),box=$('zakatHistoryList');box.innerHTML=h.length?h.slice().reverse().map(r=>`<div class="item ${r.cancelled?'danger-card':''}"><div class="desc"><b>${r.date} ${r.cancelled?'(Batal)':''}</b><small>Dari laba ${formatRupiah(r.profitAtPayment)}</small></div><b class="num ${r.cancelled?'red':'gold'}">${formatRupiah(r.zakatPaid)}</b></div>`).join(''):'<div class="empty">Belum ada riwayat zakat</div>';$('zakatHistoryModal').classList.remove('hidden')}
 function closeZakatHistoryModal(){$('zakatHistoryModal').classList.add('hidden')}
 async function loadTransactions(){
-  // 1. Render cache dulu (instan) agar UI tidak blank
-  const CACHE_KEY='rh_tx_cache';
-  try{const cached=localStorage.getItem(CACHE_KEY);if(cached){transactions=JSON.parse(cached);render();renderCashFisik();}}catch(e){}
-  // 2. Fetch dari Supabase
+  // Hapus cache lama yang mungkin corrupt/dobel — Supabase adalah satu-satunya sumber kebenaran
+  try{localStorage.removeItem('rh_tx_cache');}catch(e){}
   const{data,error}=await supabaseClient.from('transactions').select('*').eq('owner_id',OWNER_ID).order('date',{ascending:false}).order('id',{ascending:false});
   if(error)throw error;
   transactions=(data||[]).map(r=>({id:Number(r.id),date:r.date,description:r.description,amount:Number(r.amount||0),type:r.type}));
-  // 3. Simpan ke cache
-  try{localStorage.setItem(CACHE_KEY,JSON.stringify(transactions));}catch(e){}
   return transactions;
 }
 async function saveTransaction(t){
   const{error}=await supabaseClient.from('transactions').insert({...t,owner_id:OWNER_ID});
   if(error)throw error;
-  // Update cache
-  try{transactions.unshift(t);localStorage.setItem('rh_tx_cache',JSON.stringify(transactions));}catch(e){}
 }
 async function deleteTransactionFromDB(id){
   const{error}=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID).eq('id',id);
   if(error)throw error;
-  // Update cache
-  try{transactions=transactions.filter(t=>t.id!==id);localStorage.setItem('rh_tx_cache',JSON.stringify(transactions));}catch(e){}
 }
 async function clearManualTransactions(){
   // Proteksi: data hasil upload Firebase tetap LOCK dan tidak ikut dihapus massal.
@@ -531,18 +523,31 @@ function renderTodayFirebaseIncomeHome(){
   }
 }
 function startTodayFirebaseWatch(){
-  if(!firebaseDb)return;
+  if(!firebaseDb)return Promise.resolve();
   const today=getLocalDateString();
   if(todayFirebaseUnsub){todayFirebaseUnsub();todayFirebaseUnsub=null}
   const q=firebaseDb.collection('transactions').where('dateKey','==',today);
-  todayFirebaseUnsub=q.onSnapshot(snap=>{
-    todayFirebaseIncomeRows=snap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>!t.deleted);
-    todayFirebaseIncomeTotal=todayFirebaseIncomeRows.reduce((a,b)=>a+Number(b.amount||0),0);
-    renderTodayFirebaseIncomeHome();
-    renderZakatSection();
-    renderProfitSummary();
-    renderCashFisik();
-  },err=>{console.error(err);if($('todayFirebaseIncomeInfo'))$('todayFirebaseIncomeInfo').innerText='Gagal baca Firebase hari ini';})
+  // Kembalikan Promise yang resolve setelah snapshot PERTAMA diterima
+  return new Promise((resolve)=>{
+    let resolved=false;
+    todayFirebaseUnsub=q.onSnapshot(snap=>{
+      todayFirebaseIncomeRows=snap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>!t.deleted);
+      todayFirebaseIncomeTotal=todayFirebaseIncomeRows.reduce((a,b)=>a+Number(b.amount||0),0);
+      if(!resolved){resolved=true;resolve();} // resolve di snapshot pertama
+      else{
+        // Update berikutnya (realtime) — render semua
+        renderTodayFirebaseIncomeHome();
+        renderZakatSection();
+        renderProfitSummary();
+        renderCashFisik();
+        render();
+      }
+    },err=>{
+      console.error(err);
+      if($('todayFirebaseIncomeInfo'))$('todayFirebaseIncomeInfo').innerText='Gagal baca Firebase hari ini';
+      if(!resolved){resolved=true;resolve();} // tetap resolve agar tidak hang
+    });
+  });
 }
 function changeFirebaseUploadDate(date){firebaseUploadDate=date||getLocalDateString();startFirebaseWatch(firebaseUploadDate)}
 function refreshFirebaseUpload(){startFirebaseWatch(firebaseUploadDate||getLocalDateString());showToast('Data Firebase direfresh')}
@@ -1304,7 +1309,30 @@ function downloadXlsMonth(){
   showToast(`File ${filename} didownload`);
 }
 
-async function initApp(){try{if(!initSupabase())return;initFirebase();await loadTransactions();await loadZakatHistory();render();renderCashFisik();if(firebaseDb){startFirebaseWatch(firebaseUploadDate||getLocalDateString());startTodayFirebaseWatch();}
+async function initApp(){try{if(!initSupabase())return;
+  // Tampilkan loading saat fetch Supabase
+  const nb=$('netBalance');if(nb){nb.innerText='Memuat...';nb.style.opacity='0.5';}
+  const st=$('statusText'),sb=$('statusBadge');
+  if(st)st.innerText='Koneksi...';
+  if(sb){sb.style.background='#e0f2fe';sb.style.color='#0369a1';}
+  initFirebase();
+  // Tunggu Supabase + Firebase keduanya siap sebelum render pertama
+  const FIREBASE_TIMEOUT=4000; // max tunggu 4 detik
+  await loadTransactions();
+  await loadZakatHistory();
+  if(firebaseDb){
+    startFirebaseWatch(firebaseUploadDate||getLocalDateString());
+    // Tunggu snapshot pertama Firebase (dengan timeout fallback)
+    await Promise.race([
+      startTodayFirebaseWatch(),
+      new Promise(r=>setTimeout(r,FIREBASE_TIMEOUT))
+    ]);
+  }
+  // Semua data siap — render sekali, langsung akurat
+  if(nb)nb.style.opacity='1';
+  if(st)st.innerText='Aman';
+  if(sb){sb.style.background='';sb.style.color='';}
+  render();renderCashFisik();
   // Supabase Realtime: auto-refresh saat ada perubahan transaksi
   try{
     supabaseClient.channel('rh-tx-realtime')
