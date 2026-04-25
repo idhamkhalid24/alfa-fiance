@@ -67,7 +67,7 @@
           <div>
             <div class="section-title" style="margin:0 0 4px;color:var(--green)">Pendapatan Hari Ini</div>
             <div id="todayFirebaseIncomeHome" class="num green" style="font-size:24px">Rp 0</div>
-            <div id="todayFirebaseIncomeInfo" class="small">Firebase hari ini + manual Kas Pribadi</div>
+            <div id="todayFirebaseIncomeInfo" class="small">Firebase + Manual - Pengeluaran hari ini</div>
           </div>
           <span class="lock-badge" style="margin-left:0;background:#eef2e8;color:var(--green)">PREVIEW</span>
         </div>
@@ -85,13 +85,13 @@
 
     <section id="pageHistory" class="page">
       <div id="netSummaryCard" class="summary-net-card">
-        <div class="summary-net-head"><div><b>Ringkasan Omset Kotor</b><small style="display:block">Total pemasukan sebelum dipotong pengeluaran</small></div><span class="pill">Supabase</span></div>
+        <div class="summary-net-head"><div><b>Ringkasan Pendapatan Bersih</b><small style="display:block">Pendapatan Firebase + Manual dikurangi Pengeluaran</small></div><span class="pill">Supabase</span></div>
         <div class="summary-net-grid">
           <div class="summary-net-box"><span>Hari Ini</span><b id="netTodaySummary" class="num green">Rp 0</b></div>
           <div class="summary-net-box"><span>Bulan Ini</span><b id="netMonthSummary" class="num blue">Rp 0</b></div>
           <div class="summary-net-box"><span>Semua</span><b id="netAllSummary" class="num gold">Rp 0</b></div>
         </div>
-        <div id="netSummaryNote" class="small" style="margin-top:8px;color:#2563eb;font-weight:800">Omset ini menghitung semua pemasukan yang sudah tersimpan di Supabase, termasuk arsip Firebase yang sudah diupload.</div>
+        <div id="netSummaryNote" class="small" style="margin-top:8px;color:#2563eb;font-weight:800">Pendapatan ini menghitung Firebase + pemasukan manual dikurangi pengeluaran pada masing-masing periode.</div>
       </div>
       <div class="tabs"><button onclick="changeFilter('today')" id="filter-today" class="tab active">Hari Ini</button><button onclick="changeFilter('month')" id="filter-month" class="tab">Bulan Ini</button><button onclick="changeFilter('range')" id="filter-range" class="tab">Custom</button><button onclick="changeFilter('all')" id="filter-all" class="tab">Semua</button></div>
       <div id="rangeSelectorHistory" class="card hidden" style="margin-bottom:10px"><div class="row"><input type="date" id="filterStartDateHistory" onchange="onHistoryRangeChange()"><input type="date" id="filterEndDateHistory" onchange="onHistoryRangeChange()"></div></div>
@@ -231,28 +231,40 @@ function changeFilter(f){currentFilter=f;$('rangeSelector').classList.toggle('hi
 async function deleteTransaction(id){const t=transactions.find(x=>Number(x.id)===Number(id));if(t&&isFirebaseUploaded(t)){showToast('Data Firebase LOCK. Gunakan tombol Sync di halaman Firebase, bukan hapus manual.');return}openPasswordModal(async()=>{try{await deleteTransactionFromDB(id);await loadTransactions();validateAndCancelInvalidZakat();render();showToast('Transaksi dihapus')}catch(e){showToast('Gagal hapus: '+e.message)}})}
 async function requestClearAll(){openPasswordModal(async()=>{if(confirm('Hapus semua data manual? Data FIREBASE LOCK tidak akan dihapus.')){try{await clearManualTransactions();await saveZakatHistory([]);await loadTransactions();render();showToast('Data manual dihapus. FIREBASE LOCK tetap aman.')}catch(e){showToast('Gagal reset: '+e.message)}}})}
 function formatRupiah(n){return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)}function getActualAmount(raw){if(!raw||isNaN(raw))return 0;return parseFloat(raw)*1000}function handleSmartAmount(input){$('liveAmountPreview').innerText=input.value?formatRupiah(getActualAmount(input.value)):''}function updatePlaceholder(){$('description').placeholder=$('type').value==='expense'?'Contoh: Makan, listrik':'Omset (boleh kosong)'}
-function getGrossIncomeForRange(mode){
+function getGrossIncomeForRange(mode,startDate,endDate){
   const today=getLocalDateString(), month=today.slice(0,7);
   if(mode==='today'){
-    // Logika Hari Ini sama dengan Riwayat Hari Ini:
-    // Firebase hari ini realtime + pemasukan manual Kas Pribadi hari ini.
-    const manualToday=(transactions||[])
+    // Pendapatan Hari Ini = Firebase hari ini + pemasukan manual - pengeluaran manual hari ini
+    const manualIncome=(transactions||[])
       .filter(t=>t.type==='income' && t.date===today && !isFirebaseUploaded(t))
       .reduce((sum,t)=>sum+Number(t.amount||0),0);
-    return manualToday + Number(todayFirebaseIncomeTotal||0);
+    const manualExpense=(transactions||[])
+      .filter(t=>t.type==='expense' && t.date===today)
+      .reduce((sum,t)=>sum+Number(t.amount||0),0);
+    return manualIncome + Number(todayFirebaseIncomeTotal||0) - manualExpense;
   }
-  const rows=transactions.filter(t=>{
+  const incomeRows=transactions.filter(t=>{
     if(t.type!=='income')return false;
     if(mode==='month')return String(t.date||'').startsWith(month);
-    return true;
+    if(mode==='range')return t.date>=(startDate||'') && t.date<=(endDate||'');
+    return true; // all
   });
-  return rows.reduce((sum,t)=>sum+Number(t.amount||0),0);
+  const expenseRows=transactions.filter(t=>{
+    if(t.type!=='expense')return false;
+    if(mode==='month')return String(t.date||'').startsWith(month);
+    if(mode==='range')return t.date>=(startDate||'') && t.date<=(endDate||'');
+    return true; // all
+  });
+  const totalIncome=incomeRows.reduce((sum,t)=>sum+Number(t.amount||0),0);
+  const totalExpense=expenseRows.reduce((sum,t)=>sum+Number(t.amount||0),0);
+  return totalIncome - totalExpense;
 }
 function updateNetSummary(){
+  const s=$('filterStartDate')?$('filterStartDate').value:'', e=$('filterEndDate')?$('filterEndDate').value:'';
   const todayGross=getGrossIncomeForRange('today'), monthGross=getGrossIncomeForRange('month'), allGross=getGrossIncomeForRange('all');
-  if($('netTodaySummary')){$('netTodaySummary').innerText=formatRupiah(todayGross);$('netTodaySummary').className='num green'}
-  if($('netMonthSummary')){$('netMonthSummary').innerText=formatRupiah(monthGross);$('netMonthSummary').className='num blue'}
-  if($('netAllSummary')){$('netAllSummary').innerText=formatRupiah(allGross);$('netAllSummary').className='num gold'}
+  if($('netTodaySummary')){$('netTodaySummary').innerText=formatRupiah(todayGross);$('netTodaySummary').className='num '+(todayGross>=0?'green':'red')}
+  if($('netMonthSummary')){$('netMonthSummary').innerText=formatRupiah(monthGross);$('netMonthSummary').className='num '+(monthGross>=0?'blue':'red')}
+  if($('netAllSummary')){$('netAllSummary').innerText=formatRupiah(allGross);$('netAllSummary').className='num '+(allGross>=0?'gold':'red')}
 }
 function getTodayManualTransactions(){
   const today=getLocalDateString();
@@ -290,21 +302,23 @@ function getFirebaseUploadId(date){return Number(String(date||'').replace(/\D/g,
 function getUploadedFirebaseTransaction(date){const id=getFirebaseUploadId(date);return transactions.find(t=>Number(t.id)===id || String(t.description||'').startsWith(`[FIREBASE:${date}]`))}
 function initFirebase(){try{if(!window.firebase)return false;if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);firebaseDb=firebase.firestore();return true}catch(e){console.error(e);showToast('Firebase gagal aktif: '+e.message);return false}}
 function renderTodayFirebaseIncomeHome(){
-  // Pendapatan Hari Ini = omset Firebase hari ini + pemasukan manual Kas Pribadi hari ini.
-  // Riwayat Hari Ini juga memakai gabungan yang sama, tapi data Firebase tetap preview/LOCK.
+  // Pendapatan Hari Ini = omset Firebase hari ini + pemasukan manual - pengeluaran hari ini.
   const totalEl=$('todayFirebaseIncomeHome'),infoEl=$('todayFirebaseIncomeInfo');
   const today=getLocalDateString();
   const manualRows=(transactions||[]).filter(t=>t.type==='income' && t.date===today && !isFirebaseUploaded(t));
   const manualTotal=manualRows.reduce((sum,t)=>sum+Number(t.amount||0),0);
   const fbTotal=Number(todayFirebaseIncomeTotal||0);
-  const total=manualTotal+fbTotal;
+  const expenseRows=(transactions||[]).filter(t=>t.type==='expense' && t.date===today);
+  const expenseTotal=expenseRows.reduce((sum,t)=>sum+Number(t.amount||0),0);
+  const total=manualTotal+fbTotal-expenseTotal;
   const fbCount=(todayFirebaseIncomeRows||[]).length;
   if(totalEl)totalEl.innerText=formatRupiah(total);
   if(infoEl){
     const parts=[];
     if(fbTotal>0)parts.push(`Firebase ${formatRupiah(fbTotal)} (${fbCount} trx)`);
     if(manualTotal>0)parts.push(`Manual ${formatRupiah(manualTotal)} (${manualRows.length} trx)`);
-    infoEl.innerText=parts.length?parts.join(' + '):'Belum ada pendapatan hari ini';
+    if(expenseTotal>0)parts.push(`Keluar ${formatRupiah(expenseTotal)}`);
+    infoEl.innerText=parts.length?parts.join(' · '):'Belum ada pendapatan hari ini';
   }
 }
 function startTodayFirebaseWatch(){
