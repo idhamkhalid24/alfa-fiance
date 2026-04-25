@@ -365,9 +365,30 @@ function validateAndCancelInvalidZakat(){const totalProfit=getTotalProfit();let 
 async function markZakatPaid(){const due=getCurrentZakatDue();if(due<=0){showToast('Zakat sudah lunas');return}const unpaid=getUnpaidProfit();const now=new Date();const ds=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;if(confirm(`Bayar Zakat Mal:\n2.5% × ${formatRupiah(unpaid)} (laba belum dizakatkan)\n= ${formatRupiah(due)}\n\nLanjutkan?`)){const h=getZakatHistory();h.push({id:Date.now(),date:ds,profitAtPayment:unpaid,zakatPaid:due,cancelled:false,note:`Zakat 2.5% dari laba ${formatRupiah(unpaid)}`});try{await saveZakatHistory(h);render();showToast('Zakat tersimpan')}catch(e){showToast('Gagal simpan zakat: '+e.message)}}}
 function showZakatHistoryModal(){const h=getZakatHistory(),box=$('zakatHistoryList');box.innerHTML=h.length?h.slice().reverse().map(r=>`<div class="item ${r.cancelled?'danger-card':''}"><div class="desc"><b>${r.date} ${r.cancelled?'(Batal)':''}</b><small>Dari laba ${formatRupiah(r.profitAtPayment)}</small></div><b class="num ${r.cancelled?'red':'gold'}">${formatRupiah(r.zakatPaid)}</b></div>`).join(''):'<div class="empty">Belum ada riwayat zakat</div>';$('zakatHistoryModal').classList.remove('hidden')}
 function closeZakatHistoryModal(){$('zakatHistoryModal').classList.add('hidden')}
-async function loadTransactions(){const{data,error}=await supabaseClient.from('transactions').select('*').eq('owner_id',OWNER_ID).order('date',{ascending:false}).order('id',{ascending:false});if(error)throw error;transactions=(data||[]).map(r=>({id:Number(r.id),date:r.date,description:r.description,amount:Number(r.amount||0),type:r.type}));return transactions}
-async function saveTransaction(t){const{error}=await supabaseClient.from('transactions').insert({...t,owner_id:OWNER_ID});if(error)throw error}
-async function deleteTransactionFromDB(id){const{error}=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID).eq('id',id);if(error)throw error}
+async function loadTransactions(){
+  // 1. Render cache dulu (instan) agar UI tidak blank
+  const CACHE_KEY='rh_tx_cache';
+  try{const cached=localStorage.getItem(CACHE_KEY);if(cached){transactions=JSON.parse(cached);render();renderCashFisik();}}catch(e){}
+  // 2. Fetch dari Supabase
+  const{data,error}=await supabaseClient.from('transactions').select('*').eq('owner_id',OWNER_ID).order('date',{ascending:false}).order('id',{ascending:false});
+  if(error)throw error;
+  transactions=(data||[]).map(r=>({id:Number(r.id),date:r.date,description:r.description,amount:Number(r.amount||0),type:r.type}));
+  // 3. Simpan ke cache
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify(transactions));}catch(e){}
+  return transactions;
+}
+async function saveTransaction(t){
+  const{error}=await supabaseClient.from('transactions').insert({...t,owner_id:OWNER_ID});
+  if(error)throw error;
+  // Update cache
+  try{transactions.unshift(t);localStorage.setItem('rh_tx_cache',JSON.stringify(transactions));}catch(e){}
+}
+async function deleteTransactionFromDB(id){
+  const{error}=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID).eq('id',id);
+  if(error)throw error;
+  // Update cache
+  try{transactions=transactions.filter(t=>t.id!==id);localStorage.setItem('rh_tx_cache',JSON.stringify(transactions));}catch(e){}
+}
 async function clearManualTransactions(){
   // Proteksi: data hasil upload Firebase tetap LOCK dan tidak ikut dihapus massal.
   const manualRows=transactions.filter(t=>!isFirebaseUploaded(t));
@@ -520,6 +541,7 @@ function startTodayFirebaseWatch(){
     renderTodayFirebaseIncomeHome();
     renderZakatSection();
     renderProfitSummary();
+    renderCashFisik();
   },err=>{console.error(err);if($('todayFirebaseIncomeInfo'))$('todayFirebaseIncomeInfo').innerText='Gagal baca Firebase hari ini';})
 }
 function changeFirebaseUploadDate(date){firebaseUploadDate=date||getLocalDateString();startFirebaseWatch(firebaseUploadDate)}
@@ -1282,7 +1304,15 @@ function downloadXlsMonth(){
   showToast(`File ${filename} didownload`);
 }
 
-async function initApp(){try{if(!initSupabase())return;initFirebase();await loadTransactions();await loadZakatHistory();render();if(firebaseDb){startFirebaseWatch(firebaseUploadDate||getLocalDateString());startTodayFirebaseWatch();}showToast('Supabase tersambung')}catch(e){console.error(e);showToast('Gagal konek: '+e.message,6000)}}initApp();
+async function initApp(){try{if(!initSupabase())return;initFirebase();await loadTransactions();await loadZakatHistory();render();renderCashFisik();if(firebaseDb){startFirebaseWatch(firebaseUploadDate||getLocalDateString());startTodayFirebaseWatch();}
+  // Supabase Realtime: auto-refresh saat ada perubahan transaksi
+  try{
+    supabaseClient.channel('rh-tx-realtime')
+      .on('postgres_changes',{event:'*',schema:'public',table:'transactions',filter:`owner_id=eq.${OWNER_ID}`},async()=>{
+        await loadTransactions();render();renderCashFisik();
+      }).subscribe();
+  }catch(e){console.warn('Realtime tidak aktif:',e);}
+  showToast('Supabase tersambung')}catch(e){console.error(e);showToast('Gagal konek: '+e.message,6000)}}initApp();
 </script>
 </body>
 </html>
