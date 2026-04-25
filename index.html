@@ -152,7 +152,7 @@
         <div class="stat" onclick="showExpenseListTodayModal()" style="cursor:pointer;border-color:#ffd7d0;background:#fff8f6"><span>Pengeluaran Hari Ini</span><b id="spendingLimit" class="red num">Rp 0</b><div style="font-size:9px;color:var(--red);font-weight:900;margin-top:3px">Tap untuk lihat detail</div></div>
       </div>
       <div id="operationalCard" class="card safe-card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;gap:8px"><b>Sisa Operasional</b><b id="operationalUsed" class="num">Rp 0</b></div><div class="small">Limit 20%: <span id="operationalTotal">Rp 0</span> · Terpakai: <span id="operationalSpent">Rp 0</span></div><div id="limitWarning" class="small red" style="font-weight:900;margin-top:5px"></div></div>
-      <div class="card"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px"><div><div class="section-title" style="margin:0 0 3px">Zakat Mal</div><div id="zakatAmountLarge" class="num gold" style="font-size:23px">Rp 0</div><div id="zakatPaymentStatusText" class="small">Menunggu</div></div><button id="payZakatBtn" class="btn gold" style="width:auto;min-width:92px;padding:10px" onclick="markZakatPaid()">Bayar</button></div><div class="grid2" style="margin-top:10px"><div class="stat"><span>Total Laba</span><b id="totalProfitDisplay" class="num">Rp 0</b></div><div class="stat"><span>Belum Zakat</span><b id="unpaidProfitDisplay" class="num">Rp 0</b></div></div><div style="display:none"><span id="totalZakatPaidProfit">Rp 0</span></div><div id="zakatHistoryPreview" class="zakat-mini" style="display:none"><div id="zakatHistoryMiniList" class="zakat-mini"></div><button class="tab" onclick="showZakatHistoryModal()">Semua</button></div></div>
+      <div class="card"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px"><div><div class="section-title" style="margin:0 0 3px">Zakat Mal</div><div id="zakatAmountLarge" class="num gold" style="font-size:23px">Rp 0</div><div id="zakatPaymentStatusText" class="small">Menunggu</div></div><button id="payZakatBtn" class="btn gold" style="width:auto;min-width:92px;padding:10px" onclick="markZakatPaid()">Bayar</button></div><div class="grid2" style="margin-top:10px"><div class="stat"><span>Laba 20% (Manual+Firebase)</span><b id="totalProfitDisplay" class="num">Rp 0</b></div><div class="stat"><span>Belum Dizakatkan</span><b id="unpaidProfitDisplay" class="num">Rp 0</b></div></div><div style="font-size:10px;color:var(--muted);font-weight:800;margin-top:7px;padding-top:7px;border-top:1px solid var(--line)">Zakat = 2.5% × laba bersih (20% dari total pendapatan manual + Firebase)</div><div style="display:none"><span id="totalZakatPaidProfit">Rp 0</span></div><div id="zakatHistoryPreview" class="zakat-mini" style="display:none"><div id="zakatHistoryMiniList" class="zakat-mini"></div><button class="tab" onclick="showZakatHistoryModal()">Semua</button></div></div>
       <button class="btn whatsapp" onclick="sendWhatsAppReport()">Laporan WA</button>
     </section>
 
@@ -269,12 +269,22 @@ function closeTransactionModal(){$('transactionModal').classList.add('hidden')}
 function getZakatHistory(){return zakatHistory||[]}
 async function loadZakatHistory(){if(!supabaseClient)return[];const{data,error}=await supabaseClient.from('zakat_history').select('*').eq('owner_id',OWNER_ID).order('id',{ascending:true});if(error)throw error;zakatHistory=(data||[]).map(r=>({id:Number(r.id),date:r.date,profitAtPayment:Number(r.profit_at_payment||0),zakatPaid:Number(r.zakat_paid||0),cancelled:!!r.cancelled,cancelledAt:r.cancelled_at,note:r.note||''}));return zakatHistory}
 async function saveZakatHistory(history){zakatHistory=history;if(!supabaseClient)return;const del=await supabaseClient.from('zakat_history').delete().eq('owner_id',OWNER_ID);if(del.error)throw del.error;if(!history.length)return;const rows=history.map(r=>({id:r.id,owner_id:OWNER_ID,date:r.date,profit_at_payment:r.profitAtPayment,zakat_paid:r.zakatPaid,cancelled:!!r.cancelled,cancelled_at:r.cancelledAt||null,note:r.note||''}));const ins=await supabaseClient.from('zakat_history').insert(rows);if(ins.error)throw ins.error}
-function getTotalProfit(){let total=0;transactions.forEach(t=>{if(t.type==='income')total+=t.amount});return total*.2}
+function getTotalProfit(){
+  // Basis zakat = 2.5% dari laba bersih (20% dari TOTAL pendapatan: manual + Firebase lock + Firebase hari ini)
+  let totalIncome=0;
+  transactions.forEach(t=>{if(t.type==='income')totalIncome+=Number(t.amount||0)});
+  // Tambahkan Firebase hari ini jika belum di-sync ke Supabase
+  const today=getLocalDateString();
+  const fbToday=Number(todayFirebaseIncomeTotal||0);
+  const uploadedTodayTx=getUploadedFirebaseTransaction(today);
+  if(fbToday>0&&!uploadedTodayTx)totalIncome+=fbToday;
+  return totalIncome*.2;
+}
 function getTotalProfitZakatPaid(){return getZakatHistory().reduce((a,r)=>a+(!r.cancelled?r.profitAtPayment:0),0)}
 function getUnpaidProfit(){return Math.max(0,getTotalProfit()-getTotalProfitZakatPaid())}
 function getCurrentZakatDue(){return getUnpaidProfit()*.025}
 function validateAndCancelInvalidZakat(){const totalProfit=getTotalProfit();let changed=false;const upd=getZakatHistory().map(r=>{if(!r.cancelled&&r.profitAtPayment>totalProfit){changed=true;return{...r,cancelled:true,cancelledAt:new Date().toISOString()}}return r});if(changed)saveZakatHistory(upd).catch(e=>showToast('Gagal update zakat: '+e.message));return changed}
-async function markZakatPaid(){const due=getCurrentZakatDue();if(due<=0){showToast('Zakat sudah lunas');return}const unpaid=getUnpaidProfit();const now=new Date();const ds=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;if(confirm(`Bayar zakat ${formatRupiah(due)} dari laba ${formatRupiah(unpaid)}?`)){const h=getZakatHistory();h.push({id:Date.now(),date:ds,profitAtPayment:unpaid,zakatPaid:due,cancelled:false,note:`Zakat dari laba ${formatRupiah(unpaid)}`});try{await saveZakatHistory(h);render();showToast('Zakat tersimpan')}catch(e){showToast('Gagal simpan zakat: '+e.message)}}}
+async function markZakatPaid(){const due=getCurrentZakatDue();if(due<=0){showToast('Zakat sudah lunas');return}const unpaid=getUnpaidProfit();const now=new Date();const ds=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;if(confirm(`Bayar Zakat Mal:\n2.5% × ${formatRupiah(unpaid)} (laba belum dizakatkan)\n= ${formatRupiah(due)}\n\nLanjutkan?`)){const h=getZakatHistory();h.push({id:Date.now(),date:ds,profitAtPayment:unpaid,zakatPaid:due,cancelled:false,note:`Zakat 2.5% dari laba ${formatRupiah(unpaid)}`});try{await saveZakatHistory(h);render();showToast('Zakat tersimpan')}catch(e){showToast('Gagal simpan zakat: '+e.message)}}}
 function showZakatHistoryModal(){const h=getZakatHistory(),box=$('zakatHistoryList');box.innerHTML=h.length?h.slice().reverse().map(r=>`<div class="item ${r.cancelled?'danger-card':''}"><div class="desc"><b>${r.date} ${r.cancelled?'(Batal)':''}</b><small>Dari laba ${formatRupiah(r.profitAtPayment)}</small></div><b class="num ${r.cancelled?'red':'gold'}">${formatRupiah(r.zakatPaid)}</b></div>`).join(''):'<div class="empty">Belum ada riwayat zakat</div>';$('zakatHistoryModal').classList.remove('hidden')}
 function closeZakatHistoryModal(){$('zakatHistoryModal').classList.add('hidden')}
 async function loadTransactions(){const{data,error}=await supabaseClient.from('transactions').select('*').eq('owner_id',OWNER_ID).order('date',{ascending:false}).order('id',{ascending:false});if(error)throw error;transactions=(data||[]).map(r=>({id:Number(r.id),date:r.date,description:r.description,amount:Number(r.amount||0),type:r.type}));return transactions}
@@ -385,7 +395,7 @@ function getFilteredTransactions(){
   return transactions.filter(t=>currentFilter==='month'?t.date.startsWith(now.substring(0,7)):currentFilter==='range'?t.date>=s&&t.date<=e:true)
 }
 function getPeriodLabel(){const now=getLocalDateString();if(currentFilter==='today')return `Hari Ini (${now})`;if(currentFilter==='month')return `Bulan Ini`;if(currentFilter==='range')return `${$('filterStartDate').value} s.d ${$('filterEndDate').value}`;return 'Semua Riwayat'}
-function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else{te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});let r=`📊 *LAPORAN ROCKY HIJAB*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20%: ${formatRupiah(ti*.2)}\n🕌 Zakat wajib: ${formatRupiah(getCurrentZakatDue())}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari Rocky Hijab Finance_'}
+function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else{te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});const labaTotal=getTotalProfit();const zakatDue=getCurrentZakatDue();let r=`📊 *LAPORAN ROCKY HIJAB*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20% (Manual+Firebase): ${formatRupiah(labaTotal)}\n🕌 Zakat wajib (2.5% laba): ${formatRupiah(zakatDue)}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari Rocky Hijab Finance_'}
 function sendWhatsAppReport(){if(!getFilteredTransactions().length){showToast('Tidak ada transaksi');return}const no=prompt('Nomor WhatsApp tujuan. Kosongkan untuk copy laporan.','');const report=generateWhatsAppReport();if(no&&no.trim()){let n=no.replace(/[^0-9]/g,'');if(n.startsWith('0'))n='62'+n.slice(1);if(!n.startsWith('62'))n='62'+n;window.open(`https://wa.me/${n}?text=${encodeURIComponent(report)}`,'_blank');showToast('Membuka WhatsApp')}else{navigator.clipboard.writeText(report).then(()=>showToast('Laporan disalin')).catch(()=>showToast('Gagal salin'))}}
 
 function isFirebaseUploaded(t){return !!(t&&t.__firebasePreview) || String(t?.description||'').startsWith('[FIREBASE:')}
@@ -430,6 +440,8 @@ function startTodayFirebaseWatch(){
     todayFirebaseIncomeRows=snap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>!t.deleted);
     todayFirebaseIncomeTotal=todayFirebaseIncomeRows.reduce((a,b)=>a+Number(b.amount||0),0);
     renderTodayFirebaseIncomeHome();
+    renderZakatSection();
+    renderProfitSummary();
   },err=>{console.error(err);if($('todayFirebaseIncomeInfo'))$('todayFirebaseIncomeInfo').innerText='Gagal baca Firebase hari ini';})
 }
 function changeFirebaseUploadDate(date){firebaseUploadDate=date||getLocalDateString();startFirebaseWatch(firebaseUploadDate)}
@@ -677,6 +689,24 @@ function getDashboardTransactions(){
   // termasuk arsip FIREBASE LOCK. Jangan ikut filter Riwayat/Firebase.
   return transactions || [];
 }
+function renderZakatSection(){
+  validateAndCancelInvalidZakat();
+  // Zakat = 2.5% dari laba bersih (laba = 20% total pendapatan manual+Firebase)
+  const totalProfit=getTotalProfit(),paid=getTotalProfitZakatPaid(),unpaid=getUnpaidProfit(),due=getCurrentZakatDue();
+  if($('zakatAmountLarge'))$('zakatAmountLarge').innerText=formatRupiah(due);
+  if($('totalProfitDisplay'))$('totalProfitDisplay').innerText=formatRupiah(totalProfit);
+  if($('totalZakatPaidProfit'))$('totalZakatPaidProfit').innerText=formatRupiah(paid);
+  if($('unpaidProfitDisplay'))$('unpaidProfitDisplay').innerText=formatRupiah(unpaid);
+  const pay=$('payZakatBtn'),zs=$('zakatPaymentStatusText');
+  if(!pay||!zs)return;
+  if(totalProfit<=0){zs.innerText='Belum ada laba';pay.disabled=true;pay.style.opacity=.5}
+  else if(due<=0){zs.innerText='Zakat lunas ✓';pay.disabled=true;pay.style.opacity=.5}
+  else{zs.innerText=`Wajib bayar 2.5% dari laba Rp${formatRupiah(unpaid).replace('Rp','')}`;pay.disabled=false;pay.style.opacity=1}
+  const h=getZakatHistory(),prev=$('zakatHistoryPreview'),mini=$('zakatHistoryMiniList');
+  if(!prev||!mini)return;
+  if(h.length){prev.style.display='flex';const valid=h.filter(x=>!x.cancelled).slice(-2).reverse();mini.innerHTML=valid.length?valid.map(x=>`<span class="chip">${formatRupiah(x.zakatPaid)}</span>`).join(''):'<span class="chip">Zakat batal</span>'}
+  else prev.style.display='none';
+}
 function render(){
   updateNetSummary();
   renderTodayFirebaseIncomeHome();
@@ -695,9 +725,13 @@ function render(){
       if(String(t.date||'').startsWith(thisMonth))monthOut+=Number(t.amount||0);
     }
   });
-  const profit=totalIn*.2;
-  const net=totalIn-totalOut;
-  $('totalIncome').innerText=formatRupiah(totalIn);
+  // Tambah Firebase hari ini ke totalIn jika belum di-sync (agar autoProfit & saldo realtime)
+  const fbTodayVal=Number(todayFirebaseIncomeTotal||0);
+  const uploadedTodayCheck=getUploadedFirebaseTransaction(today);
+  const totalInWithFirebase=totalIn+(fbTodayVal>0&&!uploadedTodayCheck?fbTodayVal:0);
+  const profit=totalInWithFirebase*.2;
+  const net=totalInWithFirebase-totalOut;
+  $('totalIncome').innerText=formatRupiah(totalInWithFirebase);
   $('totalExpense').innerText=formatRupiah(todayOut);   // hero: hari ini
   $('autoProfit').innerText=formatRupiah(profit);
   $('netBalance').innerText=formatRupiah(net);
@@ -724,20 +758,7 @@ function render(){
   if($('expenseFilteredSummary'))$('expenseFilteredSummary').innerText=formatRupiah(filteredOut);
   if($('expenseFilteredLabel'))$('expenseFilteredLabel').innerText=filteredLabel;
 
-  validateAndCancelInvalidZakat();
-  const totalProfit=getTotalProfit(),paid=getTotalProfitZakatPaid(),unpaid=getUnpaidProfit(),due=getCurrentZakatDue();
-  $('zakatAmountLarge').innerText=formatRupiah(due);
-  $('totalProfitDisplay').innerText=formatRupiah(totalProfit);
-  $('totalZakatPaidProfit').innerText=formatRupiah(paid);
-  $('unpaidProfitDisplay').innerText=formatRupiah(unpaid);
-  const pay=$('payZakatBtn'),zs=$('zakatPaymentStatusText');
-  if(totalProfit<=0){zs.innerText='Belum ada laba';pay.disabled=true;pay.style.opacity=.5}
-  else if(due<=0){zs.innerText='Zakat lunas';pay.disabled=true;pay.style.opacity=.5}
-  else{zs.innerText='Wajib dibayar';pay.disabled=false;pay.style.opacity=1}
-
-  const h=getZakatHistory(),prev=$('zakatHistoryPreview'),mini=$('zakatHistoryMiniList');
-  if(h.length){prev.style.display='flex';const valid=h.filter(x=>!x.cancelled).slice(-2).reverse();mini.innerHTML=valid.length?valid.map(x=>`<span class="chip">${formatRupiah(x.zakatPaid)}</span>`).join(''):'<span class="chip">Zakat batal</span>'}
-  else prev.style.display='none';
+  renderZakatSection();
 
   const over=totalOut>profit&&profit>0;
   $('operationalCard').className='card '+(over?'danger-card':'safe-card');
