@@ -451,7 +451,7 @@ async function deleteTransactionFromDB(id){
 }
 async function clearManualTransactions(){
   // Proteksi: data hasil upload Firebase tetap LOCK dan tidak ikut dihapus massal.
-  const manualRows=transactions.filter(t=>!isFirebaseUploaded(t));
+  const manualRows=transactions.filter(t=>!isFirebaseUploaded(t)&&!isAutoQrisCashOut(t));
   for(const t of manualRows){
     const{error}=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID).eq('id',t.id);
     if(error)throw error;
@@ -526,6 +526,105 @@ async function fetchFirebaseRowsByRange(start,end){
   return normalizeFirebaseRows(Object.values(merged)).filter(t=>t.dateKey>=start&&t.dateKey<=end);
 }
 function sumFirebaseRows(rows){return (rows||[]).reduce((a,b)=>a+Number(b.amount||0),0)}
+
+// === AUTO CASH OUT QRIS DARI FIREBASE KASIR ===
+// Transaksi kasir yang metode pembayarannya QRIS / Transfer tetap dihitung sebagai omset,
+// lalu otomatis dibuat sebagai Cash Out QRIS supaya Cash Fisik berkurang tanpa input manual.
+function getFirebaseDocKeyForAutoCashOut(t={}){
+  return String(t._docId||t.clientId||t.id||t.docId||t.doc_id||[
+    t.dateKey||getFirebaseRecordDateKey(t),
+    t.user||t.username||t.name||'',
+    t.note||t.description||'',
+    t.amount||0,
+    t.createdAtMs||t.timestamp||''
+  ].join('|')).trim();
+}
+function isFirebaseQrisPayment(t={}){
+  const raw=String(t.paymentMethod||t.payment_method||t.paymentLabel||t.payment_label||t.paymentType||t.payment_type||t.metodePembayaran||t.metode_pembayaran||'').toLowerCase();
+  if(!raw)return false;
+  if(/cash|tunai/.test(raw))return false;
+  return /qris|qr\s*is|transfer|bank/.test(raw);
+}
+function autoQrisHash(s){
+  let h=2166136261;
+  s=String(s||'');
+  for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
+  return Math.abs(h>>>0)%1000000;
+}
+function getAutoQrisCashOutId(t={}){
+  const dateDigits=String(t.dateKey||getFirebaseRecordDateKey(t)||getLocalDateString()).replace(/\D/g,'').slice(0,8)||'19700101';
+  const hash=String(autoQrisHash(getFirebaseDocKeyForAutoCashOut(t))).padStart(6,'0');
+  return Number(dateDigits+'88'+hash);
+}
+function getAutoQrisCashOutMarker(t={}){
+  return `[AUTO-QRIS:${String(autoQrisHash(getFirebaseDocKeyForAutoCashOut(t))).padStart(6,'0')}]`;
+}
+function buildAutoQrisCashOutDesc(t={}){
+  const note=String(t.note||t.description||t.keterangan||'Transaksi QRIS').trim()||'Transaksi QRIS';
+  const staff=String(t.name||t.user||t.username||t.kasir||t.createdBy||'').trim();
+  const staffText=staff?` · ${staff}`:'';
+  return `${CASHOUT_PREFIX}qris] ${getAutoQrisCashOutMarker(t)} QRIS otomatis kasir - ${note}${staffText}`;
+}
+function isAutoQrisCashOut(t={}){
+  const desc=String(t.description||'');
+  return isCashOut(t)&&getCashOutType(t)==='qris'&&(desc.includes('[AUTO-QRIS:')||/QRIS\s+otomatis\s+kasir/i.test(desc));
+}
+function getAutoQrisSyncDates(rows=[],opts={}){
+  const dates=new Set();
+  const add=d=>{d=String(d||'').slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(d))dates.add(d)};
+  add(opts.date||opts.dateKey||opts.firebaseUploadDate);
+  if(Array.isArray(opts.dates))opts.dates.forEach(add);
+  (rows||[]).forEach(t=>add(t&&((t.dateKey)||getFirebaseRecordDateKey(t))));
+  return Array.from(dates);
+}
+async function deleteStaleAutoQrisCashOut(validIds,dates,opts={}){
+  if(!supabaseClient||!dates||!dates.length)return false;
+  const dateSet=new Set(dates.map(String));
+  const stale=(transactions||[]).filter(t=>isAutoQrisCashOut(t)&&dateSet.has(String(t.date||''))&&!validIds.has(Number(t.id)));
+  if(!stale.length)return false;
+  for(const t of stale){
+    const {error}=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID).eq('id',Number(t.id));
+    if(error)throw error;
+  }
+  if(!opts.quiet)showToast(`${stale.length} QRIS otomatis dihapus karena transaksi staff sudah dihapus`);
+  return true;
+}
+async function syncFirebaseQrisCashOut(rows,opts={}){
+  if(!supabaseClient||!Array.isArray(rows))return false;
+  const candidates=[];
+  const seen=new Set();
+  (rows||[]).forEach(t=>{
+    if(!t||isFirebaseRecordDeleted(t)||!isFirebaseQrisPayment(t))return;
+    const amount=Number(t.amount||0);
+    const date=t.dateKey||getFirebaseRecordDateKey(t);
+    if(!date||!amount||amount<=0)return;
+    const id=getAutoQrisCashOutId(t);
+    if(seen.has(id))return;
+    seen.add(id);
+    candidates.push({id,owner_id:OWNER_ID,date,description:buildAutoQrisCashOutDesc(t),amount,type:'expense'});
+  });
+  const validIds=new Set(candidates.map(r=>Number(r.id)));
+  const syncDates=getAutoQrisSyncDates(rows,opts);
+  const existing=new Map((transactions||[]).map(t=>[Number(t.id),t]));
+  const rowsToUpsert=candidates.filter(r=>{
+    const old=existing.get(Number(r.id));
+    return !(old&&String(old.date||'')===String(r.date)&&String(old.description||'')===String(r.description)&&Number(old.amount||0)===Number(r.amount)&&String(old.type||'')===String(r.type));
+  });
+  try{
+    const staleChanged=await deleteStaleAutoQrisCashOut(validIds,syncDates,opts);
+    if(rowsToUpsert.length){
+      const {error}=await supabaseClient.from('transactions').upsert(rowsToUpsert,{onConflict:'id'});
+      if(error)throw error;
+      if(!opts.quiet)showToast(`${rowsToUpsert.length} QRIS otomatis masuk Pengurangan Cash`);
+    }
+    return staleChanged||rowsToUpsert.length>0;
+  }catch(e){
+    console.warn('Auto Cash Out QRIS gagal:',e);
+    if(!opts.quiet)showToast('Auto QRIS gagal: '+(e.message||e));
+    return false;
+  }
+}
+
 async function getFirebaseQuerySnapshot(q){
   // Selaras dengan update database: setiap sync/cek wajib mencoba baca data terbaru dari server dulu,
   // supaya omset yang baru dibuat dari index/trk/toko tidak tertinggal karena cache lokal.
@@ -536,6 +635,8 @@ async function refreshFirebaseRowsOnce(date,mode='selected'){
   if(!firebaseDb||!date)return;
   try{
     const rows=await fetchFirebaseRowsByRange(date,date);
+    const qrisChanged=await syncFirebaseQrisCashOut(rows,{quiet:true,date});
+    if(qrisChanged)await loadTransactions();
     if(mode==='today'){
       todayFirebaseIncomeRows=rows.filter(t=>t.dateKey===date);
       todayFirebaseIncomeTotal=sumFirebaseRows(todayFirebaseIncomeRows);
@@ -556,7 +657,7 @@ function openPasswordModal(cb){pendingAction=cb;$('passwordModal').classList.rem
 async function addTransaction(){try{const dateVal=$('inputDate').value,type=$('type').value;let desc=$('description').value.trim();const amount=getActualAmount($('amount').value);if(type==='income'&&!desc)desc='Omset';if(type==='expense'&&!desc){showToast('Deskripsi pengeluaran wajib');return}if(!dateVal||amount<=0){showToast('Nominal tidak valid');return}await saveTransaction({id:Date.now(),date:dateVal,description:desc,amount,type});await loadTransactions();render();$('description').value='';$('amount').value='';$('liveAmountPreview').innerText='';$('inputDate').value=getLocalDateString();closeTransactionModal();showToast('Transaksi tersimpan');goPage('home')}catch(e){showToast('Gagal simpan: '+e.message)}}
 function onHistoryRangeChange(){$('filterStartDate').value=$('filterStartDateHistory').value;$('filterEndDate').value=$('filterEndDateHistory').value;render();}
 function changeFilter(f){currentFilter=f;$('rangeSelector').classList.toggle('hidden',f!=='range');const rh=$('rangeSelectorHistory');if(rh)rh.classList.toggle('hidden',f!=='range');if(f==='range'){const s=$('filterStartDateHistory'),e=$('filterEndDateHistory');if(s&&!s.value)s.value=getLocalDateString();if(e&&!e.value)e.value=getLocalDateString();$('filterStartDate').value=s?s.value:getLocalDateString();$('filterEndDate').value=e?e.value:getLocalDateString();}updateFilterUI();render();updateMonthValidityIdle()}function updateFilterUI(){['today','month','range','all'].forEach(f=>{const el=$('filter-'+f);if(el)el.classList.toggle('active',f===currentFilter)})}
-async function deleteTransaction(id){const t=transactions.find(x=>Number(x.id)===Number(id));if(t&&isFirebaseUploaded(t)){showToast('Data Firebase LOCK. Gunakan tombol Sync di halaman Firebase, bukan hapus manual.');return}openPasswordModal(async()=>{try{await deleteTransactionFromDB(id);await loadTransactions();validateAndCancelInvalidZakat();render();showToast('Transaksi dihapus')}catch(e){showToast('Gagal hapus: '+e.message)}})}
+async function deleteTransaction(id){const t=transactions.find(x=>Number(x.id)===Number(id));if(t&&isAutoQrisCashOut(t)){showToast('QRIS otomatis tidak bisa dihapus di sini. Hapus transaksi aslinya dari aplikasi staff.');return}if(t&&isFirebaseUploaded(t)){showToast('Data Firebase LOCK. Gunakan tombol Sync di halaman Firebase, bukan hapus manual.');return}openPasswordModal(async()=>{try{await deleteTransactionFromDB(id);await loadTransactions();validateAndCancelInvalidZakat();render();showToast('Transaksi dihapus')}catch(e){showToast('Gagal hapus: '+e.message)}})}
 async function requestClearAll(){
   openPasswordModal(async()=>{
     if(confirm('Hapus semua data manual? Data FIREBASE LOCK tidak akan dihapus.')){
@@ -740,10 +841,13 @@ function startFirebaseWatch(date){
   if($('firebaseUploadDate'))$('firebaseUploadDate').value=firebaseUploadDate;
   if(firebaseUnsub){firebaseUnsub();firebaseUnsub=null}
   const q=firebaseDb.collection('transactions').where('dateKey','==',firebaseUploadDate);
-  firebaseUnsub=q.onSnapshot(snap=>{
+  firebaseUnsub=q.onSnapshot(async snap=>{
     firebaseIncomeRows=normalizeFirebaseRows(snap.docs.map(d=>({id:d.id,_docId:d.id,...d.data()}))).filter(t=>t.dateKey===firebaseUploadDate);
     firebaseIncomeTotal=sumFirebaseRows(firebaseIncomeRows);
+    const qrisChangedSelected=await syncFirebaseQrisCashOut(firebaseIncomeRows,{quiet:true,date:firebaseUploadDate});
+    if(qrisChangedSelected)await loadTransactions();
     renderFirebaseUploadCard();
+    renderCashFisik();
     // Range fallback menjaga Kas Pribadi tetap selaras dengan index lama/baru.
     refreshFirebaseRowsOnce(firebaseUploadDate,'selected');
   },err=>{console.error(err);refreshFirebaseRowsOnce(firebaseUploadDate,'selected');showToast('Gagal baca Firebase: '+err.message)})
@@ -977,7 +1081,10 @@ async function uploadFirebaseIncome(){
     const freshRows=await fetchFirebaseRowsByRange(date,date);
     firebaseIncomeRows=freshRows.filter(t=>t.dateKey===date);
     firebaseIncomeTotal=sumFirebaseRows(firebaseIncomeRows);
+    const qrisChangedBeforeUpload=await syncFirebaseQrisCashOut(firebaseIncomeRows,{quiet:true,date:firebaseUploadDate});
+    if(qrisChangedBeforeUpload)await loadTransactions();
     renderFirebaseUploadCard();
+    renderCashFisik();
   }catch(e){showToast('Gagal cek ulang Firebase: '+e.message,5000);return;}
   await uploadFirebaseIncomeForDate(date,firebaseIncomeTotal,false);
 }
@@ -1191,7 +1298,7 @@ function getCashOutType(t){
   const m=String(t.description||'').match(/^\[CASHOUT:(\w+)\]/);
   return m?m[1]:'lainnya';
 }
-function cleanCashOutDesc(desc){return String(desc||'').replace(/^\[CASHOUT:\w+\]\s*/,'')}
+function cleanCashOutDesc(desc){return String(desc||'').replace(/^\[CASHOUT:\w+\]\s*/,'').replace(/^\[AUTO-QRIS:[^\]]+\]\s*/,'')}
 
 function setCashOutType(type){
   currentCashOutType=type;
@@ -1223,12 +1330,22 @@ function renderCashOutTodayList(){
   list.innerHTML=rows.map(t=>{
     const tp=getCashOutType(t);
     const desc=cleanCashOutDesc(t.description)||typeLabel[tp]||tp;
-    return `<div class="cashout-list-item"><div style="min-width:0;flex:1;display:flex;align-items:center;gap:7px"><span class="cashout-badge ${tp}">${typeLabel[tp]||tp}</span><div style="min-width:0"><b style="font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(desc)}</b><span style="font-size:10px;color:var(--muted)">${t.date}</span></div></div><b class="num" style="font-size:14px;color:#2563eb;white-space:nowrap">-${formatRupiah(t.amount).replace('Rp','')}</b><button class="x" style="color:var(--red);font-size:18px;padding:4px 8px" onclick="deleteCashOutWithPin(${t.id})">×</button></div>`;
+    const locked=isAutoQrisCashOut(t);
+    const action=locked
+      ? `<span class="cashout-badge qris" style="background:#eef2ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:9px;white-space:nowrap">🔒 Staff</span>`
+      : `<button class="x" style="color:var(--red);font-size:18px;padding:4px 8px" onclick="deleteCashOutWithPin(${t.id})">×</button>`;
+    const sub=locked?'QRIS otomatis · hapus dari aplikasi staff':t.date;
+    return `<div class="cashout-list-item"><div style="min-width:0;flex:1;display:flex;align-items:center;gap:7px"><span class="cashout-badge ${tp}">${typeLabel[tp]||tp}</span><div style="min-width:0"><b style="font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(desc)}</b><span style="font-size:10px;color:var(--muted)">${escapeHtml(sub)}</span></div></div><b class="num" style="font-size:14px;color:#2563eb;white-space:nowrap">-${formatRupiah(t.amount).replace('Rp','')}</b>${action}</div>`;
   }).join('');
 }
 
 
 function deleteCashOutWithPin(id){
+  const t=(transactions||[]).find(x=>Number(x.id)===Number(id));
+  if(t&&isAutoQrisCashOut(t)){
+    showToast('QRIS otomatis tidak bisa dihapus di sini. Hapus transaksi aslinya dari aplikasi staff.');
+    return;
+  }
   closeCashOutModal();
   setTimeout(()=>{
     openPasswordModal(async()=>{
