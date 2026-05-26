@@ -1334,10 +1334,17 @@ async function clearFullSupabaseData(){
   if(txDel.error)throw txDel.error;
   const zkDel=await supabaseClient.from('zakat_history').delete().eq('owner_id',OWNER_ID);
   if(zkDel.error)throw zkDel.error;
+  // Update SQL kategori: FULL reset ikut membersihkan kategori custom,
+  // lalu kategori wajib dibuat ulang agar input pengeluaran tetap aman.
+  const catDel=await supabaseClient.from('expense_categories').delete().eq('owner_id',OWNER_ID);
+  if(catDel.error)throw catDel.error;
+  expenseCategories=[];
+  try{await ensureDefaultCategories();await loadExpenseCategories();}catch(e){console.warn('Reset kategori default gagal:',e);}
 }
 function resetLocalAfterFullDelete(){
   transactions=[];
   zakatHistory=[];
+  expenseCategories=[];
   pendingFirebaseUploads=[];
   firebaseIncomeRows=[];
   firebaseIncomeTotal=0;
@@ -1538,7 +1545,8 @@ async function requestClearAll(){
 async function requestFullReset(){
   openPasswordModal(async()=>{
     const totalTx=(transactions||[]).length;
-    const ok1=confirm('PERINGATAN!\n\nHapus SEMUA data Supabase aplikasi?\n- Semua transaksi manual\n- Semua data Server Pusat sync/LOCK\n- Semua cash out QRIS/Tabungan\n- Semua operasional toko\n- Semua riwayat zakat\n\nTotal transaksi yang terbaca: '+totalTx+'.\n\nLanjutkan?');
+    const totalCat=(expenseCategories||[]).length;
+    const ok1=confirm('PERINGATAN!\n\nHapus SEMUA data Supabase aplikasi?\n- Semua transaksi manual\n- Semua data Server Pusat sync/LOCK\n- Semua cash out QRIS/Tabungan\n- Semua operasional toko\n- Semua riwayat zakat\n- Semua kategori custom pengeluaran\n\nKategori wajib Lainnya dan Operasional Toko akan dibuat ulang otomatis.\n\nTotal transaksi: '+totalTx+' data.\nTotal kategori: '+totalCat+' kategori.\n\nLanjutkan?');
     if(!ok1)return;
     const ok2=confirm('Konfirmasi terakhir: data yang dihapus tidak bisa dikembalikan dari aplikasi. Tetap hapus semua data full?');
     if(!ok2)return;
@@ -1547,9 +1555,11 @@ async function requestFullReset(){
       resetLocalAfterFullDelete();
       await loadTransactions();
       try{await loadZakatHistory();}catch(e){}
+      try{await loadExpenseCategories();await ensureDefaultCategories();await loadExpenseCategories();}catch(e){}
+      renderCategorySelects();
       render();
       renderFirebaseUploadCard();
-      showToast('Semua data Supabase aplikasi sudah dihapus full');
+      showToast('Semua data full dihapus. Kategori default dibuat ulang.');
     }catch(e){showToast('Gagal hapus full: '+e.message)}
   });
 }
@@ -2052,21 +2062,89 @@ function render(){
   renderFirebaseUploadCard();
 }
 function escapeHtml(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
-function openBackupModal(){if(!transactions.length&&!zakatHistory.length){showToast('Data kosong');return}$('backupOptionModal').classList.remove('hidden')}function closeBackupModal(){$('backupOptionModal').classList.add('hidden')}function showImportModal(){closeBackupModal();$('importModal').classList.remove('hidden')}function closeImportModal(){$('importModal').classList.add('hidden');$('importDataText').value=''}function exportToFile(){const payload={transactions,zakatHistory,expenseCategories};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`rocky_backup_${getLocalDateString()}.json`;a.click();URL.revokeObjectURL(url);closeBackupModal();showToast('Backup tersimpan (transaksi + zakat)')}function copyToClipboard(){const payload={transactions,zakatHistory,expenseCategories};navigator.clipboard.writeText(JSON.stringify(payload)).then(()=>{closeBackupModal();showToast('Data disalin (transaksi + zakat)')}).catch(()=>showToast('Gagal salin'))}
+function normalizeCategoryForBackup(c,i){
+  return {
+    id:Number(c&&c.id)||Date.now()+i,
+    owner_id:OWNER_ID,
+    name:String(c&&c.name||'').trim(),
+    sort_order:Number(c&& (c.sort_order ?? c.sortOrder) || ((i+1)*10)),
+    created_at:(c&&c.created_at)||new Date().toISOString(),
+    updated_at:(c&&c.updated_at)||new Date().toISOString()
+  };
+}
+function getBackupPayload(){
+  return {
+    app:'alfajri-finance',
+    backupVersion:2,
+    exportedAt:getWibDateTimeString?getWibDateTimeString():new Date().toISOString(),
+    owner_id:OWNER_ID,
+    transactions:(transactions||[]),
+    zakatHistory:getZakatHistory?getZakatHistory():(zakatHistory||[]),
+    expenseCategories:(expenseCategories||[]).map(normalizeCategoryForBackup).filter(c=>c.name)
+  };
+}
+function openBackupModal(){
+  if(!transactions.length&&!zakatHistory.length&&!(expenseCategories||[]).length){showToast('Data kosong');return}
+  $('backupOptionModal').classList.remove('hidden')
+}
+function closeBackupModal(){$('backupOptionModal').classList.add('hidden')}
+function showImportModal(){closeBackupModal();$('importModal').classList.remove('hidden')}
+function closeImportModal(){$('importModal').classList.add('hidden');$('importDataText').value=''}
+function exportToFile(){
+  const payload=getBackupPayload();
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=`rocky_backup_${getLocalDateString()}.json`;a.click();URL.revokeObjectURL(url);closeBackupModal();
+  showToast('Backup tersimpan (transaksi + zakat + kategori)')
+}
+function copyToClipboard(){
+  const payload=getBackupPayload();
+  navigator.clipboard.writeText(JSON.stringify(payload)).then(()=>{closeBackupModal();showToast('Data disalin (transaksi + zakat + kategori)')}).catch(()=>showToast('Gagal salin'))
+}
+async function restoreExpenseCategories(importedCategories){
+  if(!Array.isArray(importedCategories)||!importedCategories.length){await ensureDefaultCategories();await loadExpenseCategories();return 0}
+  const seenName=new Set(),seenId=new Set();
+  const clean=[];
+  importedCategories.forEach((c,i)=>{
+    const name=String(c&&c.name||'').trim();if(!name)return;
+    const key=name.toLowerCase();if(seenName.has(key))return;seenName.add(key);
+    let id=Number(c&&c.id)||Date.now()+i;
+    while(seenId.has(id)){id++}seenId.add(id);
+    clean.push({
+      id,owner_id:OWNER_ID,name,
+      sort_order:Number(c&& (c.sort_order ?? c.sortOrder) || ((i+1)*10)),
+      created_at:(c&&c.created_at)||new Date().toISOString(),
+      updated_at:new Date().toISOString()
+    });
+  });
+  if(!clean.some(c=>c.name.toLowerCase()===DEFAULT_CATEGORY_NAME.toLowerCase()))clean.unshift({id:1700000000001,owner_id:OWNER_ID,name:DEFAULT_CATEGORY_NAME,sort_order:1,created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
+  if(!clean.some(c=>c.name.toLowerCase()===OPS_CATEGORY_NAME.toLowerCase()))clean.push({id:1700000000002,owner_id:OWNER_ID,name:OPS_CATEGORY_NAME,sort_order:2,created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
+  const del=await supabaseClient.from('expense_categories').delete().eq('owner_id',OWNER_ID);
+  if(del.error)throw del.error;
+  const ins=await supabaseClient.from('expense_categories').insert(clean);
+  if(ins.error)throw ins.error;
+  await loadExpenseCategories();
+  return clean.length;
+}
 async function importFromText(){try{const raw=$('importDataText').value.trim();if(!raw){showToast('Data kosong');return}const parsed=JSON.parse(raw);
-  // Support format baru {transactions, zakatHistory} dan format lama (array langsung)
-  let importedTx=[], importedZakat=[];
+  // Support format baru {transactions,zakatHistory,expenseCategories} dan format lama array transaksi langsung.
+  let importedTx=[], importedZakat=[], importedCategories=[];
   if(Array.isArray(parsed)){
-    importedTx=parsed; // format lama
+    importedTx=parsed;
   } else if(parsed&&Array.isArray(parsed.transactions)){
     importedTx=parsed.transactions;
     importedZakat=Array.isArray(parsed.zakatHistory)?parsed.zakatHistory:[];
+    importedCategories=Array.isArray(parsed.expenseCategories)?parsed.expenseCategories:[];
   } else throw new Error('format');
-  const ok=importedTx.every(i=>i.id&&i.date&&i.description&&typeof i.amount==='number'&&(i.type==='income'||i.type==='expense'));
+  importedTx=importedTx.map(t=>({...t,amount:Number(t.amount||0)}));
+  const ok=importedTx.every(i=>i.id&&i.date&&i.description&&Number.isFinite(Number(i.amount))&&(i.type==='income'||i.type==='expense'));
   if(!ok)throw new Error('format');
+  const catCount=await restoreExpenseCategories(importedCategories);
   await importTransactions(importedTx);
   if(importedZakat.length){await saveZakatHistory(importedZakat);}
-  await loadTransactions();await loadZakatHistory();render();closeImportModal();showToast('Import berhasil'+(importedZakat.length?` (${importedZakat.length} zakat restore)`:''))}catch(e){showToast('Format JSON salah')}}
+  await loadTransactions();await loadZakatHistory();await loadExpenseCategories();await migrateLegacyExpensesToDefaultCategory();
+  renderCategorySelects();render();closeImportModal();
+  showToast('Import berhasil'+(importedZakat.length?` · ${importedZakat.length} zakat`:``)+(catCount?` · ${catCount} kategori`:``))
+}catch(e){console.warn('Import gagal:',e);showToast('Format JSON salah / restore gagal')}}
 function showToast(message,duration=2600){const old=document.querySelector('.toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=message;document.body.appendChild(t);setTimeout(()=>t.remove(),duration)}
 
 // =====================================================
